@@ -60,8 +60,8 @@
       margin:0;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
       min-height:100vh;
-      /* Fondo compuesto: degradado + imagen personalizada */
-      background:linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 100%), var(--wallpaper);
+      /* Fondo degradado; la imagen personalizada se aplica dinámicamente via JS */
+      background:linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 100%);
       background-size:cover;
       background-position:center;
       background-repeat:no-repeat;
@@ -394,6 +394,9 @@
       </label>
       <button id="applySettings">Aplicar</button>
       <button id="resetSettings">Restaurar valores</button>
+
+      <!-- Botón para volver a la pantalla principal -->
+      <button id="backSettings">Volver</button>
     </div>
   </div>
   <!-- Modal de Temas -->
@@ -431,6 +434,9 @@
       <button id="selectWallpaper">Seleccionar imagen</button>
       <button id="clearWallpaper">Quitar fondo</button>
       <input type="file" id="wallpaperInput" accept="image/*" style="display:none;" />
+
+      <!-- Botón para volver a la pantalla principal -->
+      <button id="backTheme">Volver</button>
     </div>
   </div>
   <!-- Modal de Sonido -->
@@ -445,6 +451,9 @@
         <input type="number" id="soundVolume" min="0" max="1" step="0.05" value="0.2" />
       </label>
       <button id="applySound">Aplicar</button>
+
+      <!-- Botón para volver a la pantalla principal -->
+      <button id="backSound">Volver</button>
     </div>
   </div>
   <script>
@@ -524,6 +533,10 @@
     const selectWallpaper=document.getElementById('selectWallpaper');
     const clearWallpaper=document.getElementById('clearWallpaper');
     const wallpaperInput=document.getElementById('wallpaperInput');
+    // Botones de volver en modales
+    const backSettings=document.getElementById('backSettings');
+    const backTheme=document.getElementById('backTheme');
+    const backSound=document.getElementById('backSound');
     // Sonido UI
     const soundEnabled=document.getElementById('soundEnabled');
     const soundVolume=document.getElementById('soundVolume');
@@ -537,16 +550,19 @@
     function checkAuth(){
       const user=localStorage.getItem(STORAGE_USER);
       const pwd=localStorage.getItem(STORAGE_PWD);
+      // Reiniciar campos y mensaje
+      authUser.value='';
+      authPass.value='';
+      authMsg.style.display='none';
       if(!user||!pwd){
-        // No hay cuenta
+        // No hay cuenta, mostrar registro
         authTitle.textContent='Crear cuenta';
         authBtn.textContent='Crear cuenta';
-        authGate.classList.remove('hidden');
-        return;
+      }else{
+        // Hay cuenta guardada, mostrar inicio de sesión
+        authTitle.textContent='Iniciar sesión';
+        authBtn.textContent='Iniciar sesión';
       }
-      // Pedir login
-      authTitle.textContent='Iniciar sesión';
-      authBtn.textContent='Iniciar sesión';
       authGate.classList.remove('hidden');
     }
     authBtn.addEventListener('click',()=>{
@@ -701,11 +717,24 @@
       r.setProperty('--bg2',state.settings.theme.bg2);
       r.setProperty('--panel',state.settings.theme.panel);
       r.setProperty('--panel2',state.settings.theme.panel2);
-      // Fondo personalizado
+      // Fondo personalizado: establecer variable y aplicar imagen de fondo al body
       if(state.settings.theme.wallpaper){
         r.setProperty('--wallpaper',`url(${state.settings.theme.wallpaper})`);
       }else{
         r.setProperty('--wallpaper','none');
+      }
+      // Aplicar imagen de fondo directamente para garantizar que se vea
+      const grad=`linear-gradient(180deg, ${state.settings.theme.bg1} 0%, ${state.settings.theme.bg2} 100%)`;
+      if(state.settings.theme.wallpaper){
+        document.body.style.backgroundImage = `${grad}, url(${state.settings.theme.wallpaper})`;
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundPosition = 'center';
+        document.body.style.backgroundRepeat = 'no-repeat';
+      }else{
+        document.body.style.backgroundImage = grad;
+        document.body.style.backgroundSize = '';
+        document.body.style.backgroundPosition = '';
+        document.body.style.backgroundRepeat = '';
       }
       r.setProperty('--anim-enabled',state.settings.anim?1:0);
       document.body.classList.toggle('anim-off',!state.settings.anim);
@@ -788,6 +817,11 @@
       applyCssVars();
       saveSettings();
       nextRound();
+
+      // Cerrar modal y volver a la pantalla principal
+      settingsModal.classList.remove('active');
+      settingsBtn.classList.remove('active');
+      homeBtn.classList.add('active');
     });
     resetSettingsBtn.addEventListener('click',()=>{
       state.settings={...state.settings,mode:'pvsp',aiDelay:600,anim:true,cellGap:18,cellRadius:18,markScale:1,xColor:'#3a3f95',oColor:'#ffffff'};
@@ -805,6 +839,11 @@
       applyCssVars();
       applyThemeToUI();
       saveSettings();
+
+      // Cerrar modal y volver a la pantalla principal
+      themeModal.classList.remove('active');
+      themeBtn.classList.remove('active');
+      homeBtn.classList.add('active');
     });
     resetThemeBtn.addEventListener('click',()=>{
       state.settings.theme={bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0'};
@@ -843,6 +882,11 @@
         applySettingsToUI();
         applyThemeToUI();
         saveSettings();
+
+        // Cerrar modal y volver a la pantalla principal
+        themeModal.classList.remove('active');
+        themeBtn.classList.remove('active');
+        homeBtn.classList.add('active');
       }catch(e){alert('JSON inválido');}
     });
     copyThemeJsonBtn.addEventListener('click',()=>{
@@ -888,11 +932,33 @@
       updateThemeJson();
       saveSettings();
     });
+
+    // Navegación: botones de volver en modales
+    backSettings.addEventListener('click',()=>{
+      settingsModal.classList.remove('active');
+      settingsBtn.classList.remove('active');
+      homeBtn.classList.add('active');
+    });
+    backTheme.addEventListener('click',()=>{
+      themeModal.classList.remove('active');
+      themeBtn.classList.remove('active');
+      homeBtn.classList.add('active');
+    });
+    backSound.addEventListener('click',()=>{
+      soundModal.classList.remove('active');
+      soundBtn.classList.remove('active');
+      homeBtn.classList.add('active');
+    });
     // Sonido
     applySoundBtn.addEventListener('click',()=>{
       state.settings.sound.enabled=soundEnabled.checked;
       state.settings.sound.volume=parseFloat(soundVolume.value)||0.2;
       saveSettings();
+
+      // Cerrar modal y volver a la pantalla principal
+      soundModal.classList.remove('active');
+      soundBtn.classList.remove('active');
+      homeBtn.classList.add('active');
     });
     // Guardar tema/json al cambiar colores
     themeBg1.addEventListener('change',updateThemeJson);
