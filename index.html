@@ -542,10 +542,30 @@
     const soundVolume=document.getElementById('soundVolume');
     const applySoundBtn=document.getElementById('applySound');
 
+    // Helpers para colores: convertir HEX a RGBA con opacidad y construir un gradiente con opacidad
+    function hexToRgba(hex, alpha){
+      let h=hex.replace('#','');
+      if(h.length===3) h=h.split('').map(c=>c+c).join('');
+      const bigint=parseInt(h,16);
+      const r=(bigint>>16)&255;
+      const g=(bigint>>8)&255;
+      const b=bigint&255;
+      return `rgba(${r},${g},${b},${alpha})`;
+    }
+    function linearGradientWithOpacity(color1,color2,alpha){
+      return `linear-gradient(180deg, ${hexToRgba(color1,alpha)} 0%, ${hexToRgba(color2,alpha)} 100%)`;
+    }
     // Registro/inicio de sesión
+    // Genera un hash simple base64 (nuevo formato)
     function hash(str){
-      // Sencillo hash alfanumérico (no seguro). Convierte cadena a base64.
       return btoa(str);
+    }
+    // Calcula un hash SHA-256 en hexadecimal. Usado para compatibilidad con versiones antiguas.
+    async function sha256Hex(str){
+      const encoder=new TextEncoder();
+      const data=encoder.encode(str);
+      const digest=await crypto.subtle.digest('SHA-256',data);
+      return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");
     }
     function checkAuth(){
       const user=localStorage.getItem(STORAGE_USER);
@@ -565,27 +585,46 @@
       }
       authGate.classList.remove('hidden');
     }
-    authBtn.addEventListener('click',()=>{
+    authBtn.addEventListener('click',async ()=>{
       const u=authUser.value.trim();
       const p=authPass.value.trim();
-      if(!u||!p){authMsg.textContent='Completa usuario y contraseña';authMsg.style.display='block';return;}
+      if(!u||!p){
+        authMsg.textContent='Completa usuario y contraseña';
+        authMsg.style.display='block';
+        return;
+      }
       const storedUser=localStorage.getItem(STORAGE_USER);
       const storedPwd=localStorage.getItem(STORAGE_PWD);
       if(!storedUser){
-        // Crear cuenta
+        // Crear cuenta nueva
         localStorage.setItem(STORAGE_USER,u);
+        // Guardar contraseña en nuevo formato base64
         localStorage.setItem(STORAGE_PWD,hash(p));
         authGate.classList.add('hidden');
         appEl.classList.remove('hidden');
         initGame();
       }else{
-        // Iniciar sesión
-        if(u===storedUser && hash(p)===storedPwd){
+        // Iniciar sesión: comprobar contraseña en formato base64 o antiguo SHA-256
+        const hashed=hash(p);
+        let ok=false;
+        if(u===storedUser && hashed===storedPwd){
+          ok=true;
+        }else{
+          // Intentar con hash antiguo
+          const oldHash=await sha256Hex(p);
+          if(u===storedUser && oldHash===storedPwd){
+            // Migrar: guardar en nuevo formato para próximas veces
+            localStorage.setItem(STORAGE_PWD,hashed);
+            ok=true;
+          }
+        }
+        if(ok){
           authGate.classList.add('hidden');
           appEl.classList.remove('hidden');
           initGame();
         }else{
-          authMsg.textContent='Credenciales incorrectas';authMsg.style.display='block';
+          authMsg.textContent='Credenciales incorrectas';
+          authMsg.style.display='block';
         }
       }
     });
@@ -724,7 +763,8 @@
         r.setProperty('--wallpaper','none');
       }
       // Aplicar imagen de fondo directamente para garantizar que se vea
-      const grad=`linear-gradient(180deg, ${state.settings.theme.bg1} 0%, ${state.settings.theme.bg2} 100%)`;
+      // Crear un gradiente semitransparente para permitir ver la imagen de fondo (si existe)
+      const grad = linearGradientWithOpacity(state.settings.theme.bg1,state.settings.theme.bg2,0.8);
       if(state.settings.theme.wallpaper){
         document.body.style.backgroundImage = `${grad}, url(${state.settings.theme.wallpaper})`;
         document.body.style.backgroundSize = 'cover';
@@ -829,6 +869,10 @@
       applyCssVars();
       saveSettings();
       nextRound();
+      // Cerrar modal y volver a la pantalla principal
+      settingsModal.classList.remove('active');
+      settingsBtn.classList.remove('active');
+      homeBtn.classList.add('active');
     });
     // Tema: aplicar y resetear
     applyThemeBtn.addEventListener('click',()=>{
@@ -846,10 +890,14 @@
       homeBtn.classList.add('active');
     });
     resetThemeBtn.addEventListener('click',()=>{
-      state.settings.theme={bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0'};
+      state.settings.theme={bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0',wallpaper:''};
       applyCssVars();
       applyThemeToUI();
       saveSettings();
+      // Cerrar modal y volver a la pantalla principal
+      themeModal.classList.remove('active');
+      themeBtn.classList.remove('active');
+      homeBtn.classList.add('active');
     });
     // Tema JSON helper
     function updateThemeJson(){
