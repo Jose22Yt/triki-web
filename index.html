@@ -39,6 +39,8 @@
       /* Colores de X y O */
       --x:#3a3f95;
       --o:#ffffff;
+      /* Imagen de fondo personalizada (url(...) o none) */
+      --wallpaper:none;
       /* Ajustes de tablero */
       --cell-gap:18px;
       --cell-radius:18px;
@@ -58,7 +60,11 @@
       margin:0;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
       min-height:100vh;
-      background:linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 100%);
+      /* Fondo compuesto: degradado + imagen personalizada */
+      background:linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 100%), var(--wallpaper);
+      background-size:cover;
+      background-position:center;
+      background-repeat:no-repeat;
       color:var(--text);
       display:flex;
       justify-content:center;
@@ -419,6 +425,12 @@
       <button id="exportThemeJson">Exportar .json</button>
       <input type="file" id="importThemeFile" accept="application/json" style="display:none;" />
       <button id="importThemeJson">Importar .json</button>
+
+      <!-- Fondo personalizado -->
+      <div class="sectionTitle">Fondo de pantalla</div>
+      <button id="selectWallpaper">Seleccionar imagen</button>
+      <button id="clearWallpaper">Quitar fondo</button>
+      <input type="file" id="wallpaperInput" accept="image/*" style="display:none;" />
     </div>
   </div>
   <!-- Modal de Sonido -->
@@ -450,7 +462,7 @@
         markScale:1,
         xColor:'#3a3f95',
         oColor:'#ffffff',
-        theme:{bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0'},
+        theme:{bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0',wallpaper:''},
         sound:{enabled:true,volume:0.2}
       },
       lastMove:null,
@@ -508,6 +520,10 @@
     const exportThemeJsonBtn=document.getElementById('exportThemeJson');
     const importThemeJsonBtn=document.getElementById('importThemeJson');
     const importThemeFile=document.getElementById('importThemeFile');
+    // Fondo UI
+    const selectWallpaper=document.getElementById('selectWallpaper');
+    const clearWallpaper=document.getElementById('clearWallpaper');
+    const wallpaperInput=document.getElementById('wallpaperInput');
     // Sonido UI
     const soundEnabled=document.getElementById('soundEnabled');
     const soundVolume=document.getElementById('soundVolume');
@@ -685,6 +701,12 @@
       r.setProperty('--bg2',state.settings.theme.bg2);
       r.setProperty('--panel',state.settings.theme.panel);
       r.setProperty('--panel2',state.settings.theme.panel2);
+      // Fondo personalizado
+      if(state.settings.theme.wallpaper){
+        r.setProperty('--wallpaper',`url(${state.settings.theme.wallpaper})`);
+      }else{
+        r.setProperty('--wallpaper','none');
+      }
       r.setProperty('--anim-enabled',state.settings.anim?1:0);
       document.body.classList.toggle('anim-off',!state.settings.anim);
     }
@@ -792,7 +814,15 @@
     });
     // Tema JSON helper
     function updateThemeJson(){
-      const json={name:'Mi tema',version:1,vars:{'--bg1':state.settings.theme.bg1,'--bg2':state.settings.theme.bg2,'--panel':state.settings.theme.panel,'--panel2':state.settings.theme.panel2,'--x':state.settings.xColor,'--o':state.settings.oColor}};
+      const json={name:'Mi tema',version:1,vars:{
+        '--bg1':state.settings.theme.bg1,
+        '--bg2':state.settings.theme.bg2,
+        '--panel':state.settings.theme.panel,
+        '--panel2':state.settings.theme.panel2,
+        '--x':state.settings.xColor,
+        '--o':state.settings.oColor,
+        '--wallpaper':state.settings.theme.wallpaper||''
+      }};
       themeJson.value=JSON.stringify(json,null,2);
     }
     applyThemeJsonBtn.addEventListener('click',()=>{
@@ -805,6 +835,10 @@
         if(vars['--panel2']) state.settings.theme.panel2=vars['--panel2'];
         if(vars['--x']) state.settings.xColor=vars['--x'];
         if(vars['--o']) state.settings.oColor=vars['--o'];
+        if(vars['--wallpaper']!==undefined){
+          // Asignar wallpaper; si es cadena vacía se elimina
+          state.settings.theme.wallpaper = vars['--wallpaper'] || '';
+        }
         applyCssVars();
         applySettingsToUI();
         applyThemeToUI();
@@ -830,6 +864,29 @@
       const reader=new FileReader();
       reader.onload=function(ev){themeJson.value=ev.target.result;applyThemeJsonBtn.click();};
       reader.readAsText(file);
+    });
+
+    // Fondo personalizado
+    selectWallpaper.addEventListener('click',()=>{
+      wallpaperInput.click();
+    });
+    wallpaperInput.addEventListener('change',e=>{
+      const file=e.target.files[0];
+      if(!file) return;
+      const reader=new FileReader();
+      reader.onload=function(ev){
+        state.settings.theme.wallpaper=ev.target.result;
+        applyCssVars();
+        updateThemeJson();
+        saveSettings();
+      };
+      reader.readAsDataURL(file);
+    });
+    clearWallpaper.addEventListener('click',()=>{
+      state.settings.theme.wallpaper='';
+      applyCssVars();
+      updateThemeJson();
+      saveSettings();
     });
     // Sonido
     applySoundBtn.addEventListener('click',()=>{
