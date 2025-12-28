@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Ultimate Triki - Juego Web</title>
+  <style>
+    :root {
+      --border-color: #333;
+      --primary-color: #007bff;
+      --background: #f9f9f9;
+      --card-bg: #fff;
+      --card-border: #e0e0e0;
+      --toast-bg: rgba(0,0,0,0.8);
+      --toast-color: #fff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--background);
+      color: #222;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 1.5rem;
+      text-align: center;
+    }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-gap: 4px;
+    }
+    .big-board {
+      width: 450px;
+      max-width: 100%;
+      margin: 0 auto;
+      border: 2px solid var(--border-color);
+      padding: 4px;
+      background: var(--card-bg);
+    }
+    .small-board {
+      background: var(--background);
+      border: 1px solid var(--border-color);
+      position: relative;
+    }
+    .small-board.won::after {
+      content: attr(data-winner);
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 2.5rem;
+      color: var(--primary-color);
+      pointer-events: none;
+    }
+    .cell {
+      width: 100%;
+      aspect-ratio: 1;
+      border: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .cell.disabled { cursor: default; }
+    .controls {
+      margin-top: 1rem;
+      display: flex;
+      gap: 0.5rem;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      border: none;
+      background: var(--primary-color);
+      color: #fff;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+    button.secondary {
+      background: #6c757d;
+    }
+    #help {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 4px;
+      display: none;
+      max-width: 450px;
+    }
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--toast-bg);
+      color: var(--toast-color);
+      padding: 0.75rem 1rem;
+      border-radius: 4px;
+      display: none;
+      z-index: 9999;
+    }
+  </style>
+</head>
+<body>
+  <h1>Ultimate Triki — Juego Web</h1>
+  <div class="big-board" id="bigBoard">
+    <!-- Tableros pequeños se generan con JS -->
+  </div>
+  <div class="controls">
+    <button id="btnNew">Nueva partida</button>
+    <button id="btnUndo" class="secondary">Deshacer</button>
+    <button id="btnHelp" class="secondary">Reglas</button>
+  </div>
+  <div id="status"></div>
+  <div id="help">
+    <h3>Reglas rápidas</h3>
+    <p>1) Empiezas jugando en cualquier tablero pequeño.</p>
+    <p>2) La casilla que elijas (0–8) manda al rival al tablero pequeño con ese mismo índice.</p>
+    <p>3) Si el tablero objetivo ya está ganado o lleno, el rival puede jugar en cualquier tablero disponible.</p>
+    <p>4) Ganas el tablero grande haciendo 3 tableros pequeños en línea.</p>
+  </div>
+  <div id="toast"></div>
+
+  <script>
+  // Estado del juego
+  const STATE = {
+    currentPlayer: 'X',
+    nextSmall: null, // el tablero pequeño al que debe jugar el siguiente jugador, null = cualquier
+    smallBoards: Array.from({ length: 9 }, () => ({ cells: Array(9).fill(''), winner: '' })),
+    history: [] // para deshacer
+  };
+
+  const bigBoardElement = document.getElementById('bigBoard');
+  const statusElement = document.getElementById('status');
+  const toastElement = document.getElementById('toast');
+
+  function initGame() {
+    // crear tablero grande y pequeño
+    bigBoardElement.innerHTML = '';
+    STATE.smallBoards.forEach((_, idx) => {
+      const smallEl = document.createElement('div');
+      smallEl.classList.add('small-board');
+      smallEl.dataset.index = idx;
+      const boardGrid = document.createElement('div');
+      boardGrid.classList.add('board');
+      for (let i = 0; i < 9; i++) {
+        const cell = document.createElement('div');
+        cell.classList.add('cell');
+        cell.dataset.parent = idx;
+        cell.dataset.index = i;
+        cell.addEventListener('click', onCellClick);
+        boardGrid.appendChild(cell);
+      }
+      smallEl.appendChild(boardGrid);
+      bigBoardElement.appendChild(smallEl);
+    });
+    STATE.currentPlayer = 'X';
+    STATE.nextSmall = null;
+    STATE.smallBoards = Array.from({ length: 9 }, () => ({ cells: Array(9).fill(''), winner: '' }));
+    STATE.history = [];
+    updateStatus();
+    updateActiveBoards();
+  }
+
+  function onCellClick(evt) {
+    const cell = evt.currentTarget;
+    const smallIdx = parseInt(cell.dataset.parent);
+    const cellIdx = parseInt(cell.dataset.index);
+    const board = STATE.smallBoards[smallIdx];
+    // Validar jugada
+    if (board.winner || board.cells[cellIdx]) {
+      return; // casilla ya usada o tablero ganado
+    }
+    if (STATE.nextSmall !== null && smallIdx !== STATE.nextSmall) {
+      showToast('Debes jugar en el tablero indicado.');
+      return;
+    }
+    // Registrar en historial para deshacer
+    const snapshot = JSON.parse(JSON.stringify(STATE));
+    STATE.history.push(snapshot);
+    // Marcar la jugada
+    board.cells[cellIdx] = STATE.currentPlayer;
+    cell.textContent = STATE.currentPlayer;
+    // Revisar ganador del tablero pequeño
+    if (checkWinner(board.cells)) {
+      board.winner = STATE.currentPlayer;
+      const smallEl = cell.closest('.small-board');
+      smallEl.classList.add('won');
+      smallEl.dataset.winner = STATE.currentPlayer;
+    } else if (board.cells.every(v => v)) {
+      board.winner = 'T'; // empate
+    }
+    // Revisar ganador del tablero grande
+    const bigWinner = checkBigWinner();
+    if (bigWinner) {
+      endGame(bigWinner);
+      return;
+    }
+    // Cambiar jugador y actualizar próximo tablero
+    STATE.currentPlayer = STATE.currentPlayer === 'X' ? 'O' : 'X';
+    STATE.nextSmall = board.cells[cellIdx] && STATE.smallBoards[cellIdx].winner ? null : cellIdx;
+    // Si el siguiente tablero está ganado o lleno, permitir cualquiera
+    if (STATE.nextSmall !== null) {
+      const nextBoard = STATE.smallBoards[STATE.nextSmall];
+      if (nextBoard.winner || nextBoard.cells.every(v => v)) {
+        STATE.nextSmall = null;
+      }
+    }
+    updateActiveBoards();
+    updateStatus();
+  }
+
+  function updateActiveBoards() {
+    const smallEls = document.querySelectorAll('.small-board');
+    smallEls.forEach(el => {
+      const idx = parseInt(el.dataset.index);
+      const board = STATE.smallBoards[idx];
+      const cells = el.querySelectorAll('.cell');
+      if (board.winner) {
+        cells.forEach(c => c.classList.add('disabled'));
+        return;
+      }
+      if (STATE.nextSmall === null || STATE.nextSmall === idx) {
+        // activar celdas vacías
+        cells.forEach(c => {
+          const cellIndex = parseInt(c.dataset.index);
+          if (!board.cells[cellIndex]) {
+            c.classList.remove('disabled');
+          } else {
+            c.classList.add('disabled');
+          }
+        });
+      } else {
+        // desactivar todas
+        cells.forEach(c => c.classList.add('disabled'));
+      }
+    });
+  }
+
+  function checkWinner(cells) {
+    const lines = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8],
+      [0, 3, 6], [1, 4, 7], [2, 5, 8],
+      [0, 4, 8], [2, 4, 6]
+    ];
+    return lines.some(([a, b, c]) => {
+      return cells[a] && cells[a] === cells[b] && cells[a] === cells[c];
+    });
+  }
+
+  function checkBigWinner() {
+    const boards = STATE.smallBoards.map(b => b.winner === 'T' ? '' : b.winner);
+    if (!boards.some(Boolean)) return null;
+    return checkWinner(boards) ? STATE.currentPlayer : null;
+  }
+
+  function endGame(winner) {
+    updateStatus();
+    showToast('Jugador ' + winner + ' ha ganado el tablero grande.');
+    // desactivar todas las celdas
+    document.querySelectorAll('.cell').forEach(c => c.classList.add('disabled'));
+  }
+
+  function updateStatus() {
+    let status = 'Turno de ' + STATE.currentPlayer;
+    if (STATE.nextSmall !== null) {
+      status += ' — juega en tablero ' + STATE.nextSmall;
+    } else {
+      status += ' — juega en cualquier tablero';
+    }
+    statusElement.textContent = status;
+  }
+
+  function showToast(message) {
+    toastElement.textContent = message;
+    toastElement.style.display = 'block';
+    setTimeout(() => { toastElement.style.display = 'none'; }, 2000);
+  }
+
+  // Botones
+  document.getElementById('btnNew').addEventListener('click', () => {
+    initGame();
+  });
+  document.getElementById('btnUndo').addEventListener('click', () => {
+    if (STATE.history.length === 0) return;
+    const last = STATE.history.pop();
+    // Restaurar el estado previo
+    Object.assign(STATE, JSON.parse(JSON.stringify(last)));
+    // Re-render tablero
+    // actualizamos cada celda y clases
+    STATE.smallBoards.forEach((board, idx) => {
+      const smallEl = bigBoardElement.querySelector(`.small-board[data-index="${idx}"]`);
+      const cellsEls = smallEl.querySelectorAll('.cell');
+      cellsEls.forEach((celEl) => {
+        const cIdx = parseInt(celEl.dataset.index);
+        celEl.textContent = board.cells[cIdx];
+      });
+      if (board.winner && board.winner !== 'T') {
+        smallEl.classList.add('won');
+        smallEl.dataset.winner = board.winner;
+      } else {
+        smallEl.classList.remove('won');
+        smallEl.removeAttribute('data-winner');
+      }
+    });
+    updateActiveBoards();
+    updateStatus();
+  });
+  document.getElementById('btnHelp').addEventListener('click', () => {
+    const help = document.getElementById('help');
+    help.style.display = help.style.display === 'none' ? 'block' : 'none';
+  });
+
+  // Inicializar
+  initGame();
+  </script>
+</body>
+</html>
