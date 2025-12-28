@@ -272,6 +272,16 @@
     .modalCard input[type="checkbox"]{margin-right:8px;}
     .modalCard button{margin-top:20px;width:100%;padding:10px;border-radius:12px;background:color-mix(in srgb,var(--navBtnBg) 100%,transparent);border:2px solid color-mix(in srgb,var(--stroke) 50%,transparent);color:var(--text);font-size:18px;cursor:pointer;transition:background .18s ease,border-color .18s ease;}
     .modalCard button:hover{background:color-mix(in srgb,var(--navBtnBgActive) 100%,transparent);border-color:color-mix(in srgb,var(--stroke) 80%,transparent);}
+
+    /* Animación de pulsación para botones y celdas */
+    @keyframes pop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.12); }
+      100% { transform: scale(1); }
+    }
+    .pop {
+      animation: pop var(--pop-speed, 0.3s) ease;
+    }
     .sectionTitle{margin-top:24px;font-weight:700;font-size:18px;color:var(--text);}    
     /* Autenticación */
     #authGate{
@@ -364,6 +374,7 @@
     <div class="modalCard">
       <button class="closeBtn" id="closeSettings">✕</button>
       <h2>Ajustes</h2>
+      <div class="sectionTitle">Modo de juego</div>
       <label>Modo de Juego
         <select id="modeSelect">
           <option value="pvsp">2 Jugadores (local)</option>
@@ -374,18 +385,24 @@
       <label>Tiempo de espera IA (ms)
         <input type="number" id="aiDelay" value="600" min="100" step="100" />
       </label>
+      <div class="sectionTitle">Animaciones</div>
       <label>Animaciones activadas
         <input type="checkbox" id="animEnabled" checked />
       </label>
+      <label>Velocidad del pulso (s)
+        <input type="number" id="animSpeed" value="0.3" min="0.1" max="1" step="0.1" />
+      </label>
+      <div class="sectionTitle">Tablero</div>
       <label>Espacio entre celdas (px)
         <input type="number" id="gapInput" value="18" min="0" max="40" />
       </label>
       <label>Radio de celdas (px)
         <input type="number" id="radiusInput" value="18" min="0" max="40" />
       </label>
-      <label>Tamaño ficha (escala)
+      <label>Escala ficha (X/O)
         <input type="number" id="markScaleInput" value="1" step="0.1" min="0.5" max="2" />
       </label>
+      <div class="sectionTitle">Símbolos</div>
       <label>Color X
         <input type="color" id="colorX" value="#3a3f95" />
       </label>
@@ -434,6 +451,10 @@
       <button id="selectWallpaper">Seleccionar imagen</button>
       <button id="clearWallpaper">Quitar fondo</button>
       <input type="file" id="wallpaperInput" accept="image/*" style="display:none;" />
+      <!-- Opacidad de fondo -->
+      <label>Opacidad de fondo
+        <input type="number" id="wallpaperOpacity" min="0" max="1" step="0.05" value="0.8" />
+      </label>
 
       <!-- Botón para volver a la pantalla principal -->
       <button id="backTheme">Volver</button>
@@ -450,6 +471,12 @@
       <label>Volumen
         <input type="number" id="soundVolume" min="0" max="1" step="0.05" value="0.2" />
       </label>
+      <!-- Sección de efectos de sonido -->
+      <div class="sectionTitle">Efectos</div>
+      <label>Sonido al mover
+        <input type="checkbox" id="moveSoundEnabled" checked />
+      </label>
+
       <button id="applySound">Aplicar</button>
 
       <!-- Botón para volver a la pantalla principal -->
@@ -466,13 +493,14 @@
         mode:'pvsp',
         aiDelay:600,
         anim:true,
+        animSpeed:0.3,
         cellGap:18,
         cellRadius:18,
         markScale:1,
         xColor:'#3a3f95',
         oColor:'#ffffff',
-        theme:{bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0',wallpaper:''},
-        sound:{enabled:true,volume:0.2}
+        theme:{bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0',wallpaper:'',wallpaperOpacity:0.8},
+        sound:{enabled:true,volume:0.2,moveSoundEnabled:true}
       },
       lastMove:null,
       playing:true
@@ -509,6 +537,8 @@
     const modeSelect=document.getElementById('modeSelect');
     const aiDelay=document.getElementById('aiDelay');
     const animEnabled=document.getElementById('animEnabled');
+    // velocidad de animación (pulso)
+    const animSpeedInput=document.getElementById('animSpeed');
     const gapInput=document.getElementById('gapInput');
     const radiusInput=document.getElementById('radiusInput');
     const markScaleInput=document.getElementById('markScaleInput');
@@ -533,6 +563,8 @@
     const selectWallpaper=document.getElementById('selectWallpaper');
     const clearWallpaper=document.getElementById('clearWallpaper');
     const wallpaperInput=document.getElementById('wallpaperInput');
+    // Input para opacidad de fondo
+    const wallpaperOpacityInput=document.getElementById('wallpaperOpacity');
     // Botones de volver en modales
     const backSettings=document.getElementById('backSettings');
     const backTheme=document.getElementById('backTheme');
@@ -540,6 +572,8 @@
     // Sonido UI
     const soundEnabled=document.getElementById('soundEnabled');
     const soundVolume=document.getElementById('soundVolume');
+    // Checkbox de sonido al mover
+    const moveSoundEnabled=document.getElementById('moveSoundEnabled');
     const applySoundBtn=document.getElementById('applySound');
 
     // Helpers para colores: convertir HEX a RGBA con opacidad y construir un gradiente con opacidad
@@ -660,7 +694,17 @@
     function handleCell(i){
       if(!state.playing) return;
       if(state.board[i]) return;
+      // reproducir sonido de movimiento si está habilitado
+      if(state.settings.sound.enabled && state.settings.sound.moveSoundEnabled){
+        moveAudio.volume = state.settings.sound.volume;
+        try{
+          moveAudio.currentTime = 0;
+        }catch(e){}
+        moveAudio.play().catch(()=>{});
+      }
+      // marcar celda y aplicar animación pop
       state.board[i]=state.turn;
+      addPopToCell(i);
       state.lastMove=i;
       updateUI();
       if(checkWinner(state.turn)){
@@ -763,8 +807,9 @@
         r.setProperty('--wallpaper','none');
       }
       // Aplicar imagen de fondo directamente para garantizar que se vea
-      // Crear un gradiente semitransparente para permitir ver la imagen de fondo (si existe)
-      const grad = linearGradientWithOpacity(state.settings.theme.bg1,state.settings.theme.bg2,0.8);
+      // Usar opacidad configurable para el gradiente
+      const opacity = (typeof state.settings.theme.wallpaperOpacity === 'number' ? state.settings.theme.wallpaperOpacity : 1);
+      const grad = linearGradientWithOpacity(state.settings.theme.bg1,state.settings.theme.bg2,opacity);
       if(state.settings.theme.wallpaper){
         document.body.style.backgroundImage = `${grad}, url(${state.settings.theme.wallpaper})`;
         document.body.style.backgroundSize = 'cover';
@@ -777,6 +822,8 @@
         document.body.style.backgroundRepeat = '';
       }
       r.setProperty('--anim-enabled',state.settings.anim?1:0);
+      // Ajustar la velocidad del pulso
+      r.setProperty('--pop-speed', (state.settings.animSpeed||0.3) + 's');
       document.body.classList.toggle('anim-off',!state.settings.anim);
     }
     // Ajustes -> cargar valores en formulario
@@ -784,6 +831,7 @@
       modeSelect.value=state.settings.mode;
       aiDelay.value=state.settings.aiDelay;
       animEnabled.checked=state.settings.anim;
+      animSpeedInput.value=state.settings.animSpeed;
       gapInput.value=state.settings.cellGap;
       radiusInput.value=state.settings.cellRadius;
       markScaleInput.value=state.settings.markScale;
@@ -798,10 +846,16 @@
       themePanel2.value=state.settings.theme.panel2;
       // actualizar json
       updateThemeJson();
+
+      // actualizar controles de opacidad de fondo
+      if(wallpaperOpacityInput) {
+        wallpaperOpacityInput.value = state.settings.theme.wallpaperOpacity ?? 1;
+      }
     }
     function applySoundToUI(){
       soundEnabled.checked=state.settings.sound.enabled;
       soundVolume.value=state.settings.sound.volume;
+      if(moveSoundEnabled) moveSoundEnabled.checked = state.settings.sound.moveSoundEnabled;
     }
     // Guardar configuración
     function saveSettings(){
@@ -809,6 +863,9 @@
     }
     // Sonido simple con Web Audio API
     let audioCtx;
+    // Sonido de movimiento (clic). Cargado desde archivo MP3 alojado junto al juego.
+    const moveAudio = new Audio('mouse-click-sfx-444806.mp3');
+    moveAudio.preload = 'auto';
     function playTone(freq,dur){
       if(!state.settings.sound.enabled) return;
       if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
@@ -825,6 +882,37 @@
       if(type==='win') playTone(440,0.3);
       else if(type==='draw') playTone(180,0.2);
       else playTone(300,0.1);
+    }
+
+    // === Animación de pulsación ===
+    // Agrega la clase .pop al elemento y la remueve al finalizar la animación.
+    function addPop(el){
+      if(!state.settings.anim) return;
+      el.classList.add('pop');
+      el.addEventListener('animationend',function handler(){
+        el.classList.remove('pop');
+        el.removeEventListener('animationend',handler);
+      });
+    }
+    // Añade efecto pop a una celda del tablero usando su índice
+    function addPopToCell(idx){
+      const el = boardEl.children[idx];
+      if(el) addPop(el);
+    }
+    // Adjunta el efecto pop a botones de navegación y botones principales
+    function attachPopToElements(){
+      const navButtons=[homeBtn,settingsBtn,themeBtn,soundBtn];
+      navButtons.forEach(btn=>{
+        btn.addEventListener('click',()=>{addPop(btn);});
+      });
+      // Botones principales (reiniciar, nueva ronda, reiniciar todo)
+      document.querySelectorAll('.btn').forEach(btn=>{
+        btn.addEventListener('click',()=>{addPop(btn);});
+      });
+      // Botones dentro de modales (aplicar, resetear, volver, importar, etc.)
+      document.querySelectorAll('.modalCard button').forEach(btn=>{
+        btn.addEventListener('click',()=>{addPop(btn);});
+      });
     }
     // Eventos botones de navegación
     function closeAllModals(){
@@ -849,6 +937,7 @@
       state.settings.mode=modeSelect.value;
       state.settings.aiDelay=parseInt(aiDelay.value)||600;
       state.settings.anim=animEnabled.checked;
+      state.settings.animSpeed=parseFloat(animSpeedInput.value)||0.3;
       state.settings.cellGap=parseInt(gapInput.value)||18;
       state.settings.cellRadius=parseInt(radiusInput.value)||18;
       state.settings.markScale=parseFloat(markScaleInput.value)||1;
@@ -864,7 +953,18 @@
       homeBtn.classList.add('active');
     });
     resetSettingsBtn.addEventListener('click',()=>{
-      state.settings={...state.settings,mode:'pvsp',aiDelay:600,anim:true,cellGap:18,cellRadius:18,markScale:1,xColor:'#3a3f95',oColor:'#ffffff'};
+      state.settings={
+        ...state.settings,
+        mode:'pvsp',
+        aiDelay:600,
+        anim:true,
+        animSpeed:0.3,
+        cellGap:18,
+        cellRadius:18,
+        markScale:1,
+        xColor:'#3a3f95',
+        oColor:'#ffffff'
+      };
       applySettingsToUI();
       applyCssVars();
       saveSettings();
@@ -880,6 +980,8 @@
       state.settings.theme.bg2=themeBg2.value;
       state.settings.theme.panel=themePanel.value;
       state.settings.theme.panel2=themePanel2.value;
+      // guardar opacidad de fondo
+      state.settings.theme.wallpaperOpacity=parseFloat(wallpaperOpacityInput.value)||state.settings.theme.wallpaperOpacity||1;
       applyCssVars();
       applyThemeToUI();
       saveSettings();
@@ -890,7 +992,14 @@
       homeBtn.classList.add('active');
     });
     resetThemeBtn.addEventListener('click',()=>{
-      state.settings.theme={bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0',wallpaper:''};
+      state.settings.theme={
+        bg1:'#6c2bd9',
+        bg2:'#b02bd9',
+        panel:'#ff56e0',
+        panel2:'#ff7cf0',
+        wallpaper:'',
+        wallpaperOpacity:0.8
+      };
       applyCssVars();
       applyThemeToUI();
       saveSettings();
@@ -908,7 +1017,8 @@
         '--panel2':state.settings.theme.panel2,
         '--x':state.settings.xColor,
         '--o':state.settings.oColor,
-        '--wallpaper':state.settings.theme.wallpaper||''
+        '--wallpaper':state.settings.theme.wallpaper||'',
+        '--wallpaperOpacity': state.settings.theme.wallpaperOpacity ?? 1
       }};
       themeJson.value=JSON.stringify(json,null,2);
     }
@@ -925,6 +1035,10 @@
         if(vars['--wallpaper']!==undefined){
           // Asignar wallpaper; si es cadena vacía se elimina
           state.settings.theme.wallpaper = vars['--wallpaper'] || '';
+        }
+        if(vars['--wallpaperOpacity'] !== undefined){
+          const op = parseFloat(vars['--wallpaperOpacity']);
+          if(!isNaN(op)) state.settings.theme.wallpaperOpacity = op;
         }
         applyCssVars();
         applySettingsToUI();
@@ -1001,6 +1115,7 @@
     applySoundBtn.addEventListener('click',()=>{
       state.settings.sound.enabled=soundEnabled.checked;
       state.settings.sound.volume=parseFloat(soundVolume.value)||0.2;
+      state.settings.sound.moveSoundEnabled = moveSoundEnabled.checked;
       saveSettings();
 
       // Cerrar modal y volver a la pantalla principal
@@ -1018,6 +1133,8 @@
     // Iniciar autenticación cuando cargue la página
     document.addEventListener('DOMContentLoaded',()=>{
       checkAuth();
+      // Adjuntar animación de pulsación a elementos interactivos una vez cargado el DOM
+      attachPopToElements();
     });
   </script>
 </body>
