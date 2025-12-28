@@ -4,1257 +4,849 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>TRIKI — Tres en Raya</title>
+  <!--
+    Juego de tres en raya (triki) con opciones avanzadas de personalización.
+    Este archivo combina todo el HTML, CSS y JavaScript en un único documento
+    para facilitar su publicación en servicios estáticos como GitHub Pages.
+    
+    Funciones implementadas:
+    - Tablero 3×3 con estilos glass/neón.
+    - IA básica con modo Jugador vs IA y IA vs IA (autoplay).
+    - Panel de ajustes para:
+        * Cambiar colores (temas) mediante variables CSS.
+        * Ajustar animaciones (activar/desactivar).
+        * Ajustar espaciado y radio de las celdas.
+        * Personalizar el tamaño de las marcas (X/O) y sus colores.
+        * Activar/desactivar sonido y ajustar volumen.
+    - Importar/exportar temas en formato JSON.
+    - Pantalla de registro/inicio de sesión local (guardada en localStorage).
+  -->
   <style>
     :root{
+      /* Colores base del fondo */
       --bg1:#6c2bd9;
       --bg2:#b02bd9;
+      /* Colores de los paneles */
       --panel:#ff56e0;
       --panel2:#ff7cf0;
-
+      /* Efectos glass */
       --glass: rgba(255,255,255,.16);
       --glass2: rgba(255,255,255,.08);
       --stroke: rgba(255,255,255,.25);
-
+      /* Tipografía */
       --text:#ffffff;
       --muted: rgba(255,255,255,.78);
-
+      /* Colores de X y O */
       --x:#3a3f95;
       --o:#ffffff;
-
-      --shadow: 0 18px 60px rgba(0,0,0,.28);
-      --radius: 24px;
-      --cellRadius: 18px;
-      --tap: 78px;
-
-      --toastBg: rgba(0,0,0,.25);
-      --navBg: rgba(255,255,255,.32);
-      --navBtnBg: rgba(255,255,255,.10);
-      --navBtnBgActive: rgba(255,255,255,.18);
-
-      /* Altura base de la barra inferior (sin safe-area). */
-      --navH: 78px;
+      /* Ajustes de tablero */
+      --cell-gap:18px;
+      --cell-radius:18px;
+      --cell-size:78px;
+      --board-border:2px;
+      /* Ajuste de escala de las marcas (1 = tamaño normal) */
+      --mark-scale:1;
+      /* Animaciones: 1 = activadas, 0 = desactivadas */
+      --anim-enabled:1;
+      /* Sonido */
+      --volume:0.2;
+      /* Navegación inferior */
+      --navH:78px;
     }
-
     *{box-sizing:border-box}
     body{
       margin:0;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
       min-height:100vh;
-      background: linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
-      color: var(--text);
+      background:linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 100%);
+      color:var(--text);
       display:flex;
       justify-content:center;
-      padding: 18px 14px calc(var(--navH) + 14px + env(safe-area-inset-bottom, 0px));
+      padding:18px 14px calc(var(--navH) + 14px + env(safe-area-inset-bottom,0px));
     }
-
-    .app{width: min(520px, 100%);}
-
-    /* Header simple (sin íconos arriba). Los controles están abajo. */
+    .app{width:min(520px,100%);}
+    .hidden{display:none !important;}
+    /* Encabezado */
     .top{
       display:flex;
       align-items:flex-start;
       justify-content:flex-start;
       gap:14px;
-      margin-top: 8px;
+      margin-top:8px;
     }
-
-    .title h1{
-      margin:0;
-      font-size: 54px;
-      letter-spacing: .5px;
-      font-weight: 900;
-      line-height: .95;
-    }
-    .title .sub{
-      margin-top: 10px;
-      font-size: 24px;
-      color: var(--muted);
-      font-weight: 500;
-    }
-
+    .title h1{margin:0;font-size:54px;letter-spacing:.5px;font-weight:900;line-height:.95;}
+    .title .sub{margin-top:10px;font-size:24px;color:var(--muted);font-weight:500;}
+    /* Tarjeta principal */
     .card{
-      margin-top: 22px;
-      border-radius: 28px;
-      background: linear-gradient(180deg, color-mix(in srgb, var(--panel2) 86%, white 14%), var(--panel));
-      box-shadow: var(--shadow);
-      border: 2px solid color-mix(in srgb, var(--glass2) 70%, transparent);
-      padding: 18px;
+      margin-top:22px;
+      border-radius:28px;
+      background:linear-gradient(180deg,color-mix(in srgb,var(--panel2) 86%,white 14%),var(--panel));
+      box-shadow:0 18px 60px rgba(0,0,0,.28);
+      border:var(--board-border) solid color-mix(in srgb,var(--glass2) 70%,transparent);
+      padding:18px;
       position:relative;
       overflow:hidden;
     }
-
-    .turnPillWrap{display:flex; justify-content:center; margin-top: 6px;}
+    /* Pastilla de turno */
+    .turnPillWrap{display:flex;justify-content:center;margin-top:6px;}
     .turnPill{
       display:inline-flex;
       align-items:center;
       gap:12px;
-      padding: 12px 26px;
-      border-radius: 999px;
-      background: color-mix(in srgb, var(--glass) 100%, transparent);
-      border: 2px solid color-mix(in srgb, var(--stroke) 90%, transparent);
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--glass2) 90%, transparent);
-      font-weight: 900;
-      letter-spacing: 1px;
-      text-transform: uppercase;
+      padding:12px 26px;
+      border-radius:999px;
+      background:color-mix(in srgb,var(--glass) 100%,transparent);
+      border:var(--board-border) solid color-mix(in srgb,var(--stroke) 90%,transparent);
+      box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--glass2) 90%,transparent);
+      font-weight:900;
+      letter-spacing:1px;
+      text-transform:uppercase;
     }
     .turnPill .mark{
       display:inline-grid;
       place-items:center;
-      min-width: 34px;
-      height: 34px;
-      border-radius: 999px;
-      background: color-mix(in srgb, var(--glass2) 100%, transparent);
-      border: 2px solid color-mix(in srgb, var(--stroke) 70%, transparent);
-      font-size: 22px;
-      font-weight: 1000;
+      min-width:34px;height:34px;
+      border-radius:999px;
+      background:color-mix(in srgb,var(--glass2) 100%,transparent);
+      border:var(--board-border) solid color-mix(in srgb,var(--stroke) 70%,transparent);
+      font-size:22px;font-weight:1000;
     }
-
+    /* Tablero */
     .boardShell{
-      margin-top: 18px;
-      border-radius: 30px;
-      padding: 18px;
-      background: color-mix(in srgb, var(--glass) 92%, transparent);
-      border: 2px solid color-mix(in srgb, var(--stroke) 70%, transparent);
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--glass2) 85%, transparent);
+      margin-top:18px;
+      border-radius:30px;
+      padding:18px;
+      background:color-mix(in srgb,var(--glass) 92%,transparent);
+      border:var(--board-border) solid color-mix(in srgb,var(--stroke) 70%,transparent);
+      box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--glass2) 85%,transparent);
     }
-
     .board{
       width:100%;
-      aspect-ratio: 1/1;
+      aspect-ratio:1/1;
       display:grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 18px;
-      padding: 10px;
-      border-radius: 26px;
-      background: color-mix(in srgb, var(--glass2) 100%, transparent);
-      border: 2px solid color-mix(in srgb, var(--stroke) 65%, transparent);
+      grid-template-columns:repeat(3,1fr);
+      gap:var(--cell-gap);
+      padding:10px;
+      border-radius:26px;
+      background:color-mix(in srgb,var(--glass2) 100%,transparent);
+      border:var(--board-border) solid color-mix(in srgb,var(--stroke) 65%,transparent);
     }
-
     .cell{
-      border-radius: var(--cellRadius);
-      background: color-mix(in srgb, var(--glass) 92%, transparent);
-      border: 2px solid color-mix(in srgb, var(--stroke) 78%, transparent);
-      box-shadow: 0 18px 34px rgba(0,0,0,.10);
+      border-radius:var(--cell-radius);
+      background:color-mix(in srgb,var(--glass) 92%,transparent);
+      border:var(--board-border) solid color-mix(in srgb,var(--stroke) 78%,transparent);
+      box-shadow:0 18px 34px rgba(0,0,0,.10);
       display:grid;
       place-items:center;
-      min-height: var(--tap);
-      font-weight: 1000;
-      font-size: clamp(34px, 8vw, 54px);
+      min-height:var(--cell-size);
+      font-weight:1000;
+      font-size:clamp(34px,8vw,54px);
       cursor:pointer;
-      -webkit-tap-highlight-color: transparent;
+      -webkit-tap-highlight-color:transparent;
       user-select:none;
-      transition: transform .08s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+      transition:transform .15s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
       position:relative;
       overflow:hidden;
     }
-    .cell:hover{transform: translateY(-1px); background: color-mix(in srgb, var(--glass) 110%, transparent); border-color: color-mix(in srgb, var(--stroke) 92%, transparent)}
-    .cell:active{transform: translateY(0px) scale(.99)}
-    .cell.disabled{cursor:not-allowed; opacity:.78}
-
-    .cell.win{
-      background: color-mix(in srgb, var(--glass) 145%, transparent);
-      border-color: color-mix(in srgb, var(--stroke) 140%, transparent);
-      box-shadow: 0 24px 44px rgba(0,0,0,.16);
-    }
-
-    .markX{color: var(--x); text-shadow: 0 10px 22px rgba(0,0,0,.20)}
-    .markO{color: var(--o); text-shadow: 0 10px 22px rgba(0,0,0,.20)}
-
-    .buttons{
-      display:grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 14px;
-      margin-top: 16px;
-    }
+    .anim-off .cell{transition:none !important;}
+    .cell:hover{transform:translateY(-1px);background:color-mix(in srgb,var(--glass) 110%,transparent);border-color:color-mix(in srgb,var(--stroke) 92%,transparent);}
+    .cell:active{transform:translateY(0px) scale(.98);}
+    .cell.disabled{cursor:not-allowed;opacity:.78;}
+    .cell.win{background:color-mix(in srgb,var(--glass) 145%,transparent);border-color:color-mix(in srgb,var(--stroke) 140%,transparent);box-shadow:0 24px 44px rgba(0,0,0,.16);}
+    .markX{color:var(--x);text-shadow:0 10px 22px rgba(0,0,0,.20);transform:scale(var(--mark-scale));}
+    .markO{color:var(--o);text-shadow:0 10px 22px rgba(0,0,0,.20);transform:scale(var(--mark-scale));}
+    /* Botones */
+    .buttons{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:16px;}
     .btn{
-      border-radius: 18px;
-      padding: 18px 12px;
-      border: 2px solid color-mix(in srgb, var(--stroke) 60%, transparent);
-      background: color-mix(in srgb, var(--glass2) 100%, transparent);
-      color: var(--text);
-      font-weight: 900;
-      font-size: 28px;
-      box-shadow: 0 16px 34px rgba(0,0,0,.14);
+      border-radius:18px;
+      padding:18px 12px;
+      border:var(--board-border) solid color-mix(in srgb,var(--stroke) 60%,transparent);
+      background:color-mix(in srgb,var(--glass2) 100%,transparent);
+      color:var(--text);
+      font-weight:900;
+      font-size:28px;
+      box-shadow:0 16px 34px rgba(0,0,0,.14);
       cursor:pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: transform .08s ease, background .18s ease, border-color .18s ease;
+      transition:transform .15s ease, background .18s ease, border-color .18s ease;
     }
-    .btn:hover{transform: translateY(-1px); background: color-mix(in srgb, var(--glass) 78%, transparent); border-color: color-mix(in srgb, var(--stroke) 80%, transparent)}
-    .btn:active{transform: translateY(0px) scale(.99)}
-    .btn.smallText{font-size: 22px}
-
-    .score{
-      margin-top: 16px;
-      display:grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 12px;
-    }
+    .btn:hover{transform:translateY(-1px);background:color-mix(in srgb,var(--glass) 78%,transparent);border-color:color-mix(in srgb,var(--stroke) 80%,transparent);}
+    .btn:active{transform:translateY(0px) scale(.98);}
+    .btn.smallText{font-size:22px;}
+    /* Marcador */
+    .score{margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
     .scoreCard{
-      border-radius: 18px;
-      padding: 14px 12px;
-      background: color-mix(in srgb, var(--glass2) 100%, transparent);
-      border: 2px solid color-mix(in srgb, var(--stroke) 58%, transparent);
-      box-shadow: 0 12px 26px rgba(0,0,0,.10);
+      border-radius:18px;
+      padding:14px 12px;
+      background:color-mix(in srgb,var(--glass2) 100%,transparent);
+      border:var(--board-border) solid color-mix(in srgb,var(--stroke) 58%,transparent);
+      box-shadow:0 12px 26px rgba(0,0,0,.10);
       text-align:center;
     }
-    .scoreCard .label{
-      font-size: 16px;
-      letter-spacing: 1px;
-      font-weight: 900;
-      opacity: .9;
-    }
-    .scoreCard .val{
-      margin-top: 4px;
-      font-size: 28px;
-      font-weight: 1000;
-    }
-
-    /* Barra inferior: aquí van todas las opciones (tema / ajustes / etc.) */
+    .scoreCard .label{font-size:20px;margin-bottom:4px;color:var(--muted);}    
+    .scoreCard .value{font-size:28px;font-weight:900;}
+    /* Barra inferior */
     .nav{
       position:fixed;
-      left:0; right:0; bottom:0;
-      padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
-      background: var(--navBg);
-      backdrop-filter: blur(12px);
-      border-top: 1px solid color-mix(in srgb, var(--stroke) 70%, transparent);
+      bottom:0;
+      left:0;
+      width:100%;
+      height:calc(var(--navH) + env(safe-area-inset-bottom,0px));
+      padding-bottom:env(safe-area-inset-bottom,0px);
+      background:color-mix(in srgb,var(--navBg) 100%,transparent);
+      backdrop-filter:blur(12px);
       display:flex;
+      justify-content:space-around;
+      align-items:center;
+      border-top:1px solid color-mix(in srgb,var(--stroke) 45%,transparent);
+      box-shadow:0 -10px 20px rgba(0,0,0,.25);
+      z-index:10;
+    }
+    .nav button{
+      appearance:none;
+      background:color-mix(in srgb,var(--navBtnBg) 100%,transparent);
+      border:2px solid color-mix(in srgb,var(--stroke) 50%,transparent);
+      border-radius:16px;
+      padding:12px;
+      color:var(--text);
+      cursor:pointer;
+      box-shadow:0 6px 14px rgba(0,0,0,.18);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transition:background .18s ease,border-color .18s ease;
+    }
+    .nav button.active, .nav button:hover{
+      background:color-mix(in srgb,var(--navBtnBgActive) 100%,transparent);
+      border-color:color-mix(in srgb,var(--stroke) 80%,transparent);
+    }
+    /* Modales */
+    .modal{
+      position:fixed;
+      top:0;left:0;width:100%;height:100%;
+      display:none;
+      justify-content:center;
+      align-items:center;
+      background:rgba(0,0,0,.5);
+      z-index:11;
+    }
+    .modal.active{display:flex;}
+    .modalCard{
+      background:color-mix(in srgb,var(--panel2) 86%,white 14%);
+      border-radius:28px;
+      padding:20px;
+      max-width:90%;
+      width:480px;
+      max-height:90vh;
+      overflow:auto;
+      position:relative;
+      color:var(--text);
+      box-shadow:0 18px 40px rgba(0,0,0,.30);
+    }
+    .modalCard h2{margin-top:0;font-size:32px;}
+    .closeBtn{
+      position:absolute;
+      top:12px;right:12px;
+      background:none;
+      border:none;
+      color:var(--text);
+      font-size:28px;
+      cursor:pointer;
+    }
+    .modalCard label{display:block;margin-top:14px;font-size:16px;color:var(--muted);}    
+    .modalCard input[type="number"], .modalCard input[type="text"], .modalCard input[type="password"], .modalCard input[type="color"], .modalCard select{
+      width:100%;
+      margin-top:6px;
+      padding:8px 10px;
+      border-radius:8px;
+      border:1px solid color-mix(in srgb,var(--stroke) 60%,transparent);
+      background:color-mix(in srgb,var(--glass2) 100%,transparent);
+      color:var(--text);
+      font-size:16px;
+    }
+    .modalCard input[type="checkbox"]{margin-right:8px;}
+    .modalCard button{margin-top:20px;width:100%;padding:10px;border-radius:12px;background:color-mix(in srgb,var(--navBtnBg) 100%,transparent);border:2px solid color-mix(in srgb,var(--stroke) 50%,transparent);color:var(--text);font-size:18px;cursor:pointer;transition:background .18s ease,border-color .18s ease;}
+    .modalCard button:hover{background:color-mix(in srgb,var(--navBtnBgActive) 100%,transparent);border-color:color-mix(in srgb,var(--stroke) 80%,transparent);}
+    .sectionTitle{margin-top:24px;font-weight:700;font-size:18px;color:var(--text);}    
+    /* Autenticación */
+    #authGate{
+      position:fixed;
+      top:0;left:0;right:0;bottom:0;
+      background:linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 100%);
+      display:flex;
+      align-items:center;
       justify-content:center;
       z-index:50;
     }
-    .navInner{
-      width: min(520px, 100%);
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap: 10px;
+    #authGate.hidden{display:none;}
+    #authGateCard{
+      background:color-mix(in srgb,var(--panel2) 86%,white 14%);
+      border-radius:28px;
+      padding:24px;
+      max-width:90%;
+      width:400px;
+      color:var(--text);
+      box-shadow:0 18px 40px rgba(0,0,0,.30);
     }
-    .navBtn{
-      width: 64px;
-      height: 54px;
-      border-radius: 18px;
-      border: 2px solid color-mix(in srgb, var(--stroke) 55%, transparent);
-      background: var(--navBtnBg);
-      display:grid;
-      place-items:center;
-      cursor:pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: transform .08s ease, background .18s ease;
-      color: var(--text);
-    }
-    .navBtn svg{width: 26px; height: 26px; opacity:.85}
-    .navBtn.active{background: var(--navBtnBgActive)}
-    .navBtn:active{transform: scale(.98)}
-
-    .toast{
-      position: fixed;
-      left: 50%;
-      transform: translateX(-50%);
-      bottom: calc(var(--navH) + 8px + env(safe-area-inset-bottom, 0px));
-      background: var(--toastBg);
-      border: 1px solid color-mix(in srgb, var(--stroke) 70%, transparent);
-      color: var(--text);
-      padding: 10px 14px;
-      border-radius: 999px;
-      box-shadow: 0 14px 34px rgba(0,0,0,.18);
-      backdrop-filter: blur(10px);
-      display:none;
-      z-index:60;
-      font-weight: 800;
-      letter-spacing: .3px;
-      max-width: calc(100% - 28px);
-      overflow:hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .toast.show{display:block}
-
-    .backdrop{
-      position:fixed;
-      inset:0;
-      background: rgba(0,0,0,.30);
-      display:none;
-      z-index:70;
-    }
-    .backdrop.show{display:block}
-
-    .modal{
-      position:fixed;
-      left:50%;
-      transform: translateX(-50%);
-      bottom: calc(14px + var(--navH) + env(safe-area-inset-bottom, 0px));
-      width: min(520px, calc(100% - 24px));
-      border-radius: 26px;
-      background: rgba(255,255,255,.22);
-      border: 1px solid rgba(255,255,255,.25);
-      backdrop-filter: blur(16px);
-      box-shadow: 0 22px 70px rgba(0,0,0,.25);
-      padding: 14px;
-      display:none;
-      z-index:80;
-      overflow:hidden;
-      color: var(--text);
-    }
-    .modal.show{display:block}
-
-    .modalHeader{display:flex; align-items:center; justify-content:space-between; gap:10px; padding: 6px 6px 10px;}
-    .modalHeader h2{margin:0; font-size: 18px; font-weight: 950; letter-spacing:.4px}
-    .close{
-      width: 42px; height: 42px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,.22);
-      background: rgba(255,255,255,.12);
-      color: var(--text);
-      cursor:pointer;
-      display:grid;
-      place-items:center;
-    }
-
-    .grid2{display:grid; grid-template-columns: 1fr 1fr; gap: 10px}
-    .field{
-      border-radius: 18px;
-      padding: 12px;
-      border: 1px solid rgba(255,255,255,.22);
-      background: rgba(255,255,255,.10);
-    }
-    .field label{display:block; font-size: 12px; font-weight: 900; letter-spacing:.6px; opacity:.9}
-    select, input[type="number"], input[type="text"], textarea{
-      width:100%;
-      margin-top: 8px;
-      padding: 12px 12px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,.24);
-      background: rgba(255,255,255,.12);
-      color: var(--text);
-      outline:none;
-      font-weight: 850;
-    }
-    input[type="color"]{
-      width:100%;
-      height: 44px;
-      margin-top: 8px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,.24);
-      background: rgba(255,255,255,.12);
-      padding: 6px;
-    }
-    textarea{
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      min-height: 140px;
-      resize: vertical;
-      font-weight: 650;
-      line-height: 1.35;
-    }
-
-    .row{display:flex; gap:10px; flex-wrap:wrap;}
-    .pillBtn{
-      flex:1;
-      min-width: 140px;
-      border-radius: 18px;
-      padding: 12px;
-      border: 1px solid rgba(255,255,255,.22);
-      background: rgba(255,255,255,.12);
-      color: var(--text);
-      font-weight: 950;
-      cursor:pointer;
-    }
-
-    .presetRow{display:flex; gap:10px; flex-wrap:wrap; padding: 6px;}
-    .chip{
-      border-radius: 999px;
-      padding: 10px 12px;
-      font-size: 12px;
-      font-weight: 950;
-      letter-spacing:.4px;
-      border: 1px solid rgba(255,255,255,.22);
-      background: rgba(255,255,255,.10);
-      cursor:pointer;
-      user-select:none;
-    }
-
-    .hint{margin: 8px 6px 0; font-size: 12px; opacity:.9; line-height:1.35}
-    .hint code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 11px; opacity:.95}
-
-    .divider{height:1px; background: rgba(255,255,255,.18); margin: 12px 6px;}
-
-    @media (max-width: 390px){
-      .title h1{font-size: 46px}
-      .title .sub{font-size: 21px}
-      .btn{font-size: 22px}
-      .btn.smallText{font-size: 18px}
-      .grid2{grid-template-columns: 1fr}
-      .board{gap: 14px}
-      .navBtn{width: 60px; height: 52px}
-    }
+    #authGateCard h2{margin-top:0;font-size:28px;}
+    #authGateCard input{width:100%;margin-top:10px;padding:10px;border-radius:8px;border:1px solid color-mix(in srgb,var(--stroke) 60%,transparent);background:color-mix(in srgb,var(--glass2) 100%,transparent);color:var(--text);font-size:16px;}
+    #authGateCard button{width:100%;margin-top:16px;padding:12px;border-radius:12px;background:color-mix(in srgb,var(--navBtnBg) 100%,transparent);border:2px solid color-mix(in srgb,var(--stroke) 50%,transparent);color:var(--text);font-size:18px;cursor:pointer;transition:background .18s ease,border-color .18s ease;}
+    #authGateCard button:hover{background:color-mix(in srgb,var(--navBtnBgActive) 100%,transparent);border-color:color-mix(in srgb,var(--stroke) 80%,transparent);}
   </style>
 </head>
 <body>
-  <div class="app">
+  <!-- Autenticación -->
+  <div id="authGate">
+    <div id="authGateCard">
+      <h2 id="authTitle">Crear cuenta</h2>
+      <input id="authUser" type="text" placeholder="Usuario" />
+      <input id="authPass" type="password" placeholder="Contraseña" />
+      <button id="authBtn">Crear cuenta</button>
+      <p id="authMsg" style="margin-top:10px;color:#ffcccc;font-size:14px;display:none;"></p>
+    </div>
+  </div>
+  <!-- Aplicación principal -->
+  <div class="app hidden" id="app">
     <div class="top">
       <div class="title">
         <h1>TRIKI</h1>
         <div class="sub">Tres en Raya</div>
       </div>
-      <!-- Sin botones arriba: todo queda en la barra inferior -->
-</div>
-
+    </div>
     <div class="card">
+      <!-- Turno -->
       <div class="turnPillWrap">
-        <div class="turnPill">
-          <span>TURNO:</span>
-          <span class="mark" id="turnMark">X</span>
+        <div class="turnPill"><span>TURNO:</span> <span class="mark" id="turnMark">X</span></div>
+      </div>
+      <!-- Tablero -->
+      <div class="boardShell">
+        <div class="board" id="board">
+          <!-- Las celdas se generan dinámicamente -->
         </div>
       </div>
-
-      <div class="boardShell">
-        <div class="board" id="board" aria-label="Tablero de triki"></div>
-      </div>
-
+      <!-- Botones principales -->
       <div class="buttons">
-        <button class="btn" id="btnResetRound">Reiniciar</button>
-        <button class="btn" id="btnNewRound">Nueva<br>Ronda</button>
-        <button class="btn smallText" id="btnResetAll">Reiniciar<br>Todo</button>
+        <button class="btn" id="btnReset">Reiniciar</button>
+        <button class="btn" id="btnNext">Nueva Ronda</button>
+        <button class="btn" id="btnResetAll">Reiniciar Todo</button>
       </div>
-
+      <!-- Marcador -->
       <div class="score">
         <div class="scoreCard">
           <div class="label">X</div>
-          <div class="val" id="sx">0</div>
+          <div class="value" id="scoreX">0</div>
         </div>
         <div class="scoreCard">
-          <div class="label">EMPATES</div>
-          <div class="val" id="sd">0</div>
+          <div class="label">Empates</div>
+          <div class="value" id="scoreD">0</div>
         </div>
         <div class="scoreCard">
           <div class="label">O</div>
-          <div class="val" id="so">0</div>
+          <div class="value" id="scoreO">0</div>
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- ✅ Barra inferior: controles de tema / ajustes / etc. -->
-  <div class="nav">
-    <div class="navInner">
-      <button class="navBtn active" id="navHome" title="Inicio">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M3 11l9-8 9 8"></path>
-          <path d="M9 22V12h6v10"></path>
-        </svg>
-      </button>
-
-      <button class="navBtn" id="navToggle" title="Claro / Noche">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"></path>
-        </svg>
-      </button>
-
-      <button class="navBtn" id="navTheme" title="Tema">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20Z"></path>
-          <path d="M8 14h.01"></path><path d="M12 18h.01"></path><path d="M16 14h.01"></path><path d="M9 9h.01"></path><path d="M15 9h.01"></path>
-        </svg>
-      </button>
-
-      <button class="navBtn" id="navSettings" title="Ajustes">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"></path>
-          <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.06.06a2.2 2.2 0 0 1-1.56 3.76 2.2 2.2 0 0 1-1.56-.64l-.06-.06a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.1 1.64V22a2.2 2.2 0 0 1-4.4 0v-.08A1.8 1.8 0 0 0 7 20.28a1.8 1.8 0 0 0-1.98.36l-.06.06A2.2 2.2 0 1 1 2.4 17.1l.06-.06A1.8 1.8 0 0 0 2.82 15a1.8 1.8 0 0 0-1.64-1.1H1a2.2 2.2 0 0 1 0-4.4h.08A1.8 1.8 0 0 0 2.72 7a1.8 1.8 0 0 0-.36-1.98l-.06-.06A2.2 2.2 0 0 1 3.86 1.2c.56 0 1.14.22 1.56.64l.06.06A1.8 1.8 0 0 0 7 2.22 1.8 1.8 0 0 0 8.1 0.58V0.5a2.2 2.2 0 0 1 4.4 0v.08A1.8 1.8 0 0 0 13.7 2.22a1.8 1.8 0 0 0 1.98-.36l.06-.06c.42-.42 1-.64 1.56-.64a2.2 2.2 0 0 1 1.56 3.76l-.06.06A1.8 1.8 0 0 0 19.4 9c.9.22 1.56 1.02 1.56 1.96v.08a2.2 2.2 0 0 1-1.56 2.12Z"></path>
-        </svg>
-      </button>
-
-      <button class="navBtn" id="navSound" title="Sonido">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M9 18V5l12-2v13"></path>
-          <circle cx="7" cy="18" r="2"></circle>
-          <circle cx="19" cy="16" r="2"></circle>
-        </svg>
-      </button>
+    <!-- Barra inferior de navegación -->
+    <div class="nav">
+      <button id="homeBtn" class="active">🏠</button>
+      <button id="settingsBtn">⚙️</button>
+      <button id="themeBtn">🎨</button>
+      <button id="soundBtn">🔊</button>
     </div>
   </div>
-
-  <div class="toast" id="toast"></div>
-  <div class="backdrop" id="backdrop"></div>
-
-  <div class="modal" id="modalSettings" aria-label="Configuración">
-    <div class="modalHeader">
+  <!-- Modal de Ajustes del Juego -->
+  <div class="modal" id="settingsModal">
+    <div class="modalCard">
+      <button class="closeBtn" id="closeSettings">✕</button>
       <h2>Ajustes</h2>
-      <button class="close" data-close="settings" aria-label="Cerrar">✕</button>
-    </div>
-
-    <div class="grid2">
-      <div class="field">
-        <label>Modo</label>
-        <select id="mode">
-          <option value="pvp">2 Jugadores (local)</option>
-          <option value="ai">Jugador vs IA</option>
-          <option value="aivai">IA vs IA (autoplay)</option>
+      <label>Modo de Juego
+        <select id="modeSelect">
+          <option value="pvsp">2 Jugadores (local)</option>
+          <option value="pvai">Jugador vs IA</option>
+          <option value="aivsa">IA vs IA (autoplay)</option>
         </select>
-      </div>
-      <div class="field" id="fieldHuman">
-        <label>Humano juega con</label>
-        <select id="human">
-          <option value="X">X</option>
-          <option value="O">O</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Dificultad IA</label>
-        <select id="difficulty">
-          <option value="easy">Fácil</option>
-          <option value="normal">Normal</option>
-          <option value="hard">Difícil</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Tiempo pensar (ms)</label>
-        <input id="think" type="number" min="0" max="2000" step="50" value="300" />
-      </div>
+      </label>
+      <label>Tiempo de espera IA (ms)
+        <input type="number" id="aiDelay" value="600" min="100" step="100" />
+      </label>
+      <label>Animaciones activadas
+        <input type="checkbox" id="animEnabled" checked />
+      </label>
+      <label>Espacio entre celdas (px)
+        <input type="number" id="gapInput" value="18" min="0" max="40" />
+      </label>
+      <label>Radio de celdas (px)
+        <input type="number" id="radiusInput" value="18" min="0" max="40" />
+      </label>
+      <label>Tamaño ficha (escala)
+        <input type="number" id="markScaleInput" value="1" step="0.1" min="0.5" max="2" />
+      </label>
+      <label>Color X
+        <input type="color" id="colorX" value="#3a3f95" />
+      </label>
+      <label>Color O
+        <input type="color" id="colorO" value="#ffffff" />
+      </label>
+      <button id="applySettings">Aplicar</button>
+      <button id="resetSettings">Restaurar valores</button>
     </div>
-
-    <div class="row" style="margin-top:10px">
-      <button class="pillBtn" id="btnApplySettings">Aplicar</button>
-      <button class="pillBtn" id="btnResetSettings">Restaurar</button>
-    </div>
-
-    <div class="hint">La IA mueve sola cuando es su turno. En <b>Difícil</b> juega perfecto (minimax).</div>
   </div>
-
-  <div class="modal" id="modalTheme" aria-label="Tema">
-    <div class="modalHeader">
+  <!-- Modal de Temas -->
+  <div class="modal" id="themeModal">
+    <div class="modalCard">
+      <button class="closeBtn" id="closeTheme">✕</button>
       <h2>Tema</h2>
-      <button class="close" data-close="theme" aria-label="Cerrar">✕</button>
+      <p>Colores actuales. Cambia y guarda tu propio tema:</p>
+      <label>Color fondo arriba
+        <input type="color" id="themeBg1" value="#6c2bd9" />
+      </label>
+      <label>Color fondo abajo
+        <input type="color" id="themeBg2" value="#b02bd9" />
+      </label>
+      <label>Panel principal
+        <input type="color" id="themePanel" value="#ff56e0" />
+      </label>
+      <label>Panel secundario
+        <input type="color" id="themePanel2" value="#ff7cf0" />
+      </label>
+      <button id="applyTheme">Aplicar tema</button>
+      <button id="resetTheme">Restaurar tema</button>
+      <div class="sectionTitle">Tema en JSON (importar / exportar)</div>
+      <label>Editor JSON
+        <textarea id="themeJson" rows="6" style="width:100%;margin-top:8px;padding:10px;border-radius:8px;background:color-mix(in srgb,var(--glass2) 100%,transparent);border:1px solid color-mix(in srgb,var(--stroke) 60%,transparent);color:var(--text);"></textarea>
+      </label>
+      <button id="applyThemeJson">Aplicar JSON</button>
+      <button id="copyThemeJson">Copiar JSON</button>
+      <button id="exportThemeJson">Exportar .json</button>
+      <input type="file" id="importThemeFile" accept="application/json" style="display:none;" />
+      <button id="importThemeJson">Importar .json</button>
     </div>
-
-    <div class="presetRow" id="themePresets"></div>
-
-    <div class="grid2" style="margin-top:8px">
-      <div class="field"><label>Fondo arriba</label><input id="cBg1" type="color" /></div>
-      <div class="field"><label>Fondo abajo</label><input id="cBg2" type="color" /></div>
-      <div class="field"><label>Panel</label><input id="cPanel" type="color" /></div>
-      <div class="field"><label>Panel 2</label><input id="cPanel2" type="color" /></div>
-      <div class="field"><label>Color X</label><input id="cX" type="color" /></div>
-      <div class="field"><label>Color O</label><input id="cO" type="color" /></div>
-    </div>
-
-    <div class="row" style="margin-top:10px">
-      <button class="pillBtn" id="btnSaveTheme">Guardar</button>
-      <button class="pillBtn" id="btnResetTheme">Restaurar</button>
-    </div>
-
-    <div class="divider"></div>
-
-    <div class="field">
-      <label>🎛️ Tema en JSON (importar / exportar)</label>
-      <textarea id="themeJsonArea" spellcheck="false"></textarea>
-      <div class="row" style="margin-top:10px">
-        <button class="pillBtn" id="btnApplyThemeJson">Aplicar JSON</button>
-        <button class="pillBtn" id="btnCopyThemeJson">Copiar JSON</button>
-      </div>
-      <div class="row" style="margin-top:10px">
-        <button class="pillBtn" id="btnExportThemeJson">Exportar .json</button>
-        <button class="pillBtn" id="btnImportThemeJson">Importar .json</button>
-      </div>
-      <div class="hint">
-        Soporta dos formatos:<br>
-        1) <code>{"name":"Mi tema","version":1,"vars":{"--bg1":"#...", "--x":"#..."}}</code><br>
-        2) Plano: <code>{"--bg1":"#...","--x":"#..."}</code>
-      </div>
-      <input id="themeFile" type="file" accept="application/json" style="display:none" />
-    </div>
-
-    <div class="hint" style="margin-top:10px">El tema se guarda en tu navegador (localStorage).</div>
   </div>
-
-  <div class="modal" id="modalSound" aria-label="Sonido">
-    <div class="modalHeader">
+  <!-- Modal de Sonido -->
+  <div class="modal" id="soundModal">
+    <div class="modalCard">
+      <button class="closeBtn" id="closeSound">✕</button>
       <h2>Sonido</h2>
-      <button class="close" data-close="sound" aria-label="Cerrar">✕</button>
+      <label>Audio activado
+        <input type="checkbox" id="soundEnabled" checked />
+      </label>
+      <label>Volumen
+        <input type="number" id="soundVolume" min="0" max="1" step="0.05" value="0.2" />
+      </label>
+      <button id="applySound">Aplicar</button>
     </div>
-
-    <div class="field">
-      <label>Audio</label>
-      <select id="sound">
-        <option value="on">Activado</option>
-        <option value="off">Desactivado</option>
-      </select>
-    </div>
-
-    <div class="row" style="margin-top:10px">
-      <button class="pillBtn" id="btnApplySound">Aplicar</button>
-    </div>
-
-    <div class="hint">Tip: en iPhone a veces necesitas tocar la pantalla primero para habilitar audio.</div>
   </div>
-
   <script>
-    // ─────────────────────────────────────────────────────────────────────────────
-    // TRIKI — Tres en raya + IA + tema + config + JSON Themes
-    // (Controles solo en barra inferior)
-    // ─────────────────────────────────────────────────────────────────────────────
-
-    const LINES = [
-      [0,1,2],[3,4,5],[6,7,8],
-      [0,3,6],[1,4,7],[2,5,8],
-      [0,4,8],[2,4,6]
-    ];
-
-    const THEME_SCHEMA_VERSION = 1;
-
-    const DEFAULT_SETTINGS = {
-      mode: 'pvp',        // pvp | ai | aivai
-      human: 'X',         // X | O
-      difficulty: 'normal', // easy | normal | hard
-      thinkMs: 250,
-      sound: 'off'
-    };
-
-    const DEFAULT_THEME_VARS = {
-      '--bg1': '#6c2bd9',
-      '--bg2': '#b02bd9',
-      '--panel': '#ff56e0',
-      '--panel2': '#ff7cf0',
-
-      '--glass': 'rgba(255,255,255,.16)',
-      '--glass2': 'rgba(255,255,255,.08)',
-      '--stroke': 'rgba(255,255,255,.25)',
-
-      '--text': '#ffffff',
-      '--muted': 'rgba(255,255,255,.78)',
-
-      '--x': '#3a3f95',
-      '--o': '#ffffff',
-
-      '--shadow': '0 18px 60px rgba(0,0,0,.28)',
-      '--radius': '24px',
-      '--cellRadius': '18px',
-      '--tap': '78px',
-
-      '--toastBg': 'rgba(0,0,0,.25)',
-      '--navBg': 'rgba(255,255,255,.32)',
-      '--navBtnBg': 'rgba(255,255,255,.10)',
-      '--navBtnBgActive': 'rgba(255,255,255,.18)'
-    };
-
-    const THEME_PRESETS = [
-      { name:'Pink', vars:{ '--bg1':'#6c2bd9','--bg2':'#b02bd9','--panel':'#ff56e0','--panel2':'#ff7cf0','--x':'#3a3f95','--o':'#ffffff','--text':'#ffffff','--glass':'rgba(255,255,255,.16)','--glass2':'rgba(255,255,255,.08)','--stroke':'rgba(255,255,255,.25)','--navBg':'rgba(255,255,255,.32)' } },
-      { name:'Neón', vars:{ '--bg1':'#3f2bd9','--bg2':'#d92bb2','--panel':'#ff5bd6','--panel2':'#ff8cf1','--x':'#2d2f6f','--o':'#ffffff','--text':'#ffffff','--glass':'rgba(255,255,255,.15)','--glass2':'rgba(255,255,255,.07)','--stroke':'rgba(255,255,255,.24)','--navBg':'rgba(255,255,255,.30)' } },
-      { name:'Ocean', vars:{ '--bg1':'#1b5bd9','--bg2':'#2bd9b2','--panel':'#49e9ff','--panel2':'#7bfff0','--x':'#0b2b66','--o':'#ffffff','--text':'#ffffff','--glass':'rgba(255,255,255,.14)','--glass2':'rgba(255,255,255,.06)','--stroke':'rgba(255,255,255,.22)','--navBg':'rgba(255,255,255,.28)' } },
-      { name:'Night', vars:{ '--bg1':'#28175c','--bg2':'#5c1771','--panel':'#7d2cff','--panel2':'#b65bff','--x':'#f5c2ff','--o':'#ffffff','--text':'#ffffff','--glass':'rgba(255,255,255,.12)','--glass2':'rgba(255,255,255,.05)','--stroke':'rgba(255,255,255,.20)','--navBg':'rgba(255,255,255,.22)' } }
-    ];
-
-    function loadJSON(key, fallback){
-      try{ const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; }
-      catch{ return fallback; }
-    }
-    function saveJSON(key, obj){ try{ localStorage.setItem(key, JSON.stringify(obj)); }catch{} }
-
-    const settings = { ...DEFAULT_SETTINGS, ...loadJSON('triki-settings', {}) };
-    const savedVars = loadJSON('triki-theme-vars', null);
-    let themeVars = { ...DEFAULT_THEME_VARS, ...(savedVars && typeof savedVars === 'object' ? savedVars : {}) };
-
+    // Estado del juego y configuración
     const state = {
-      board: Array(9).fill(null),
-      turn: 'X',
-      locked: false,
-      scores: { X: 0, O: 0, D: 0 },
-      starter: 'X'
+      board:Array(9).fill(''),
+      turn:'X',
+      scores:{X:0,O:0,D:0},
+      settings:{
+        mode:'pvsp',
+        aiDelay:600,
+        anim:true,
+        cellGap:18,
+        cellRadius:18,
+        markScale:1,
+        xColor:'#3a3f95',
+        oColor:'#ffffff',
+        theme:{bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0'},
+        sound:{enabled:true,volume:0.2}
+      },
+      lastMove:null,
+      playing:true
     };
 
-    // DOM
-    const boardEl = document.getElementById('board');
-    const turnMarkEl = document.getElementById('turnMark');
-    const toastEl = document.getElementById('toast');
+    // Claves de localStorage
+    const STORAGE_USER='trikiUser';
+    const STORAGE_PWD='trikiPwd';
+    const STORAGE_SETTINGS='trikiSettings';
 
-    const sxEl = document.getElementById('sx');
-    const soEl = document.getElementById('so');
-    const sdEl = document.getElementById('sd');
-
-    // Settings modal
-    const modeEl = document.getElementById('mode');
-    const humanEl = document.getElementById('human');
-    const difficultyEl = document.getElementById('difficulty');
-    const thinkEl = document.getElementById('think');
-    const fieldHuman = document.getElementById('fieldHuman');
-
-    // Theme modal pickers
-    const presetsEl = document.getElementById('themePresets');
-    const cBg1 = document.getElementById('cBg1');
-    const cBg2 = document.getElementById('cBg2');
-    const cPanel = document.getElementById('cPanel');
-    const cPanel2 = document.getElementById('cPanel2');
-    const cX = document.getElementById('cX');
-    const cO = document.getElementById('cO');
-
-    // JSON theme UI
-    const themeJsonArea = document.getElementById('themeJsonArea');
-    const themeFile = document.getElementById('themeFile');
-
-    // Sound modal
-    const soundEl = document.getElementById('sound');
-
-    // Backdrop & modals
-    const backdrop = document.getElementById('backdrop');
-    const modalSettings = document.getElementById('modalSettings');
-    const modalTheme = document.getElementById('modalTheme');
-    const modalSound = document.getElementById('modalSound');
-
+    // Dom
+    const boardEl=document.getElementById('board');
+    const turnMark=document.getElementById('turnMark');
+    const scoreX=document.getElementById('scoreX');
+    const scoreO=document.getElementById('scoreO');
+    const scoreD=document.getElementById('scoreD');
+    const appEl=document.getElementById('app');
+    const authGate=document.getElementById('authGate');
+    const authTitle=document.getElementById('authTitle');
+    const authUser=document.getElementById('authUser');
+    const authPass=document.getElementById('authPass');
+    const authBtn=document.getElementById('authBtn');
+    const authMsg=document.getElementById('authMsg');
+    // Modales
+    const settingsModal=document.getElementById('settingsModal');
+    const themeModal=document.getElementById('themeModal');
+    const soundModal=document.getElementById('soundModal');
     // Nav
-    const navButtons = {
-      home: document.getElementById('navHome'),
-      toggle: document.getElementById('navToggle'),
-      theme: document.getElementById('navTheme'),
-      settings: document.getElementById('navSettings'),
-      sound: document.getElementById('navSound')
-    };
+    const homeBtn=document.getElementById('homeBtn');
+    const settingsBtn=document.getElementById('settingsBtn');
+    const themeBtn=document.getElementById('themeBtn');
+    const soundBtn=document.getElementById('soundBtn');
+    // Ajustes UI
+    const modeSelect=document.getElementById('modeSelect');
+    const aiDelay=document.getElementById('aiDelay');
+    const animEnabled=document.getElementById('animEnabled');
+    const gapInput=document.getElementById('gapInput');
+    const radiusInput=document.getElementById('radiusInput');
+    const markScaleInput=document.getElementById('markScaleInput');
+    const colorX=document.getElementById('colorX');
+    const colorO=document.getElementById('colorO');
+    const applySettingsBtn=document.getElementById('applySettings');
+    const resetSettingsBtn=document.getElementById('resetSettings');
+    // Tema UI
+    const themeBg1=document.getElementById('themeBg1');
+    const themeBg2=document.getElementById('themeBg2');
+    const themePanel=document.getElementById('themePanel');
+    const themePanel2=document.getElementById('themePanel2');
+    const applyThemeBtn=document.getElementById('applyTheme');
+    const resetThemeBtn=document.getElementById('resetTheme');
+    const themeJson=document.getElementById('themeJson');
+    const applyThemeJsonBtn=document.getElementById('applyThemeJson');
+    const copyThemeJsonBtn=document.getElementById('copyThemeJson');
+    const exportThemeJsonBtn=document.getElementById('exportThemeJson');
+    const importThemeJsonBtn=document.getElementById('importThemeJson');
+    const importThemeFile=document.getElementById('importThemeFile');
+    // Sonido UI
+    const soundEnabled=document.getElementById('soundEnabled');
+    const soundVolume=document.getElementById('soundVolume');
+    const applySoundBtn=document.getElementById('applySound');
 
-    function setNavActive(key){
-      for(const k of Object.keys(navButtons)) navButtons[k].classList.remove('active');
-      if(navButtons[key]) navButtons[key].classList.add('active');
+    // Registro/inicio de sesión
+    function hash(str){
+      // Sencillo hash alfanumérico (no seguro). Convierte cadena a base64.
+      return btoa(str);
     }
-
-    function showToast(msg){
-      toastEl.textContent = msg;
-      toastEl.classList.add('show');
-      clearTimeout(showToast._t);
-      showToast._t = setTimeout(() => toastEl.classList.remove('show'), 1600);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Theme engine (apply/save/import/export)
-    // ─────────────────────────────────────────────────────────────────────────────
-
-    function applyThemeVars(vars){
-      const root = document.documentElement;
-      for(const [k,v] of Object.entries(vars)){
-        if(typeof k === 'string' && k.startsWith('--')) root.style.setProperty(k, String(v));
+    function checkAuth(){
+      const user=localStorage.getItem(STORAGE_USER);
+      const pwd=localStorage.getItem(STORAGE_PWD);
+      if(!user||!pwd){
+        // No hay cuenta
+        authTitle.textContent='Crear cuenta';
+        authBtn.textContent='Crear cuenta';
+        authGate.classList.remove('hidden');
+        return;
       }
+      // Pedir login
+      authTitle.textContent='Iniciar sesión';
+      authBtn.textContent='Iniciar sesión';
+      authGate.classList.remove('hidden');
     }
-
-    function saveThemeVars(){
-      saveJSON('triki-theme-vars', themeVars);
-    }
-
-    function safeHex(val, fallback){
-      if(typeof val !== 'string') return fallback;
-      const v = val.trim();
-      if(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(v)) return v;
-      return fallback;
-    }
-
-    function syncThemePickersFromVars(){
-      cBg1.value = safeHex(themeVars['--bg1'], '#6c2bd9');
-      cBg2.value = safeHex(themeVars['--bg2'], '#b02bd9');
-      cPanel.value = safeHex(themeVars['--panel'], '#ff56e0');
-      cPanel2.value = safeHex(themeVars['--panel2'], '#ff7cf0');
-      cX.value = safeHex(themeVars['--x'], '#3a3f95');
-      cO.value = safeHex(themeVars['--o'], '#ffffff');
-    }
-
-    function themeToExportObject(name='Triki Theme'){
-      return {
-        name,
-        version: THEME_SCHEMA_VERSION,
-        createdAt: new Date().toISOString(),
-        vars: { ...themeVars }
-      };
-    }
-
-    function refreshThemeJsonArea(){
-      themeJsonArea.value = JSON.stringify(themeToExportObject('Triki Theme'), null, 2);
-    }
-
-    function normalizeThemeImport(obj){
-      if(!obj || typeof obj !== 'object') throw new Error('JSON debe ser un objeto');
-      let vars = null;
-      if(obj.vars && typeof obj.vars === 'object') vars = obj.vars;
-      else vars = obj;
-
-      const cleaned = {};
-      for(const [k,v] of Object.entries(vars)){
-        if(typeof k === 'string' && k.startsWith('--')) cleaned[k] = String(v);
-      }
-      if(Object.keys(cleaned).length === 0) throw new Error('No se encontraron variables CSS (claves que empiecen por --)');
-      return cleaned;
-    }
-
-    function setThemeFromVars(partialVars, {merge=true} = {}){
-      const next = merge
-        ? { ...DEFAULT_THEME_VARS, ...themeVars, ...partialVars }
-        : { ...DEFAULT_THEME_VARS, ...partialVars };
-
-      themeVars = next;
-      applyThemeVars(themeVars);
-      saveThemeVars();
-      syncThemePickersFromVars();
-      refreshThemeJsonArea();
-    }
-
-    function exportThemeJsonFile(){
-      const data = JSON.stringify(themeToExportObject('Triki Theme'), null, 2);
-      const blob = new Blob([data], {type:'application/json'});
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'triki-theme.json';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1500);
-    }
-
-    async function copyThemeJson(){
-      try{
-        await navigator.clipboard.writeText(themeJsonArea.value);
-        showToast('JSON copiado ✅');
-      } catch {
-        themeJsonArea.focus();
-        themeJsonArea.select();
-        showToast('Seleccionado (copia manual)');
-      }
-    }
-
-    for(const el of [cBg1,cBg2,cPanel,cPanel2,cX,cO]){
-      el.addEventListener('input', () => {
-        const patch = {
-          '--bg1': cBg1.value,
-          '--bg2': cBg2.value,
-          '--panel': cPanel.value,
-          '--panel2': cPanel2.value,
-          '--x': cX.value,
-          '--o': cO.value
-        };
-        setThemeFromVars(patch);
-      });
-    }
-
-    function renderPresets(){
-      presetsEl.innerHTML = '';
-      for(const p of THEME_PRESETS){
-        const chip = document.createElement('div');
-        chip.className = 'chip';
-        chip.textContent = p.name;
-        chip.addEventListener('click', () => {
-          setThemeFromVars(p.vars, {merge:false});
-          showToast(`Tema: ${p.name}`);
-        });
-        presetsEl.appendChild(chip);
-      }
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Modal helpers
-    // ─────────────────────────────────────────────────────────────────────────────
-
-    function openModal(which){
-      backdrop.classList.add('show');
-      for(const m of [modalSettings, modalTheme, modalSound]) m.classList.remove('show');
-      if(which==='settings') modalSettings.classList.add('show');
-      if(which==='theme'){
-        modalTheme.classList.add('show');
-        refreshThemeJsonArea();
-      }
-      if(which==='sound') modalSound.classList.add('show');
-    }
-
-    function closeModal(){
-      backdrop.classList.remove('show');
-      for(const m of [modalSettings, modalTheme, modalSound]) m.classList.remove('show');
-      setNavActive('home');
-    }
-
-    backdrop.addEventListener('click', closeModal);
-    document.querySelectorAll('.close').forEach(btn => btn.addEventListener('click', closeModal));
-
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Bottom controls (solo barra inferior)
-    // ─────────────────────────────────────────────────────────────────────────────
-
-    navButtons.home.addEventListener('click', () => {
-      closeModal();
-      showToast('Listo');
-    });
-
-    navButtons.theme.addEventListener('click', () => {
-      setNavActive('theme');
-      openModal('theme');
-    });
-
-    navButtons.settings.addEventListener('click', () => {
-      setNavActive('settings');
-      openModal('settings');
-    });
-
-    navButtons.sound.addEventListener('click', () => {
-      setNavActive('sound');
-      openModal('sound');
-    });
-
-    navButtons.toggle.addEventListener('click', () => {
-      // alterna entre preset Pink y Night (puedes cambiar a otros presets si quieres)
-      const night = THEME_PRESETS.find(p => p.name==='Night').vars;
-      const pink = THEME_PRESETS.find(p => p.name==='Pink').vars;
-      const isNight = safeHex(themeVars['--bg1'], pink['--bg1']).toLowerCase() === safeHex(night['--bg1'], night['--bg1']).toLowerCase();
-      setThemeFromVars(isNight ? pink : night, {merge:false});
-      showToast(isNight ? 'Modo claro' : 'Modo noche');
-      setNavActive('home');
-    });
-
-    // Settings
-    function syncSettingsUI(){
-      modeEl.value = settings.mode;
-      humanEl.value = settings.human;
-      difficultyEl.value = settings.difficulty;
-      thinkEl.value = String(settings.thinkMs);
-      soundEl.value = settings.sound;
-      fieldHuman.style.display = (settings.mode==='ai') ? 'block' : 'none';
-    }
-    modeEl.addEventListener('change', () => {
-      fieldHuman.style.display = (modeEl.value==='ai') ? 'block' : 'none';
-    });
-
-    function clamp(n, a, b){
-      n = Number.isFinite(n) ? n : a;
-      return Math.max(a, Math.min(b, n));
-    }
-
-    document.getElementById('btnApplySettings').addEventListener('click', () => {
-      settings.mode = modeEl.value;
-      settings.human = humanEl.value;
-      settings.difficulty = difficultyEl.value;
-      settings.thinkMs = clamp(Number(thinkEl.value||0), 0, 2000);
-      saveJSON('triki-settings', settings);
-      syncSettingsUI();
-      closeModal();
-      showToast('Ajustes aplicados');
-      scheduleAIMove();
-    });
-
-    document.getElementById('btnResetSettings').addEventListener('click', () => {
-      Object.assign(settings, DEFAULT_SETTINGS);
-      saveJSON('triki-settings', settings);
-      syncSettingsUI();
-      showToast('Ajustes restaurados');
-      scheduleAIMove();
-    });
-
-    // Sound
-    document.getElementById('btnApplySound').addEventListener('click', () => {
-      settings.sound = soundEl.value;
-      saveJSON('triki-settings', settings);
-      closeModal();
-      showToast('Sonido actualizado');
-    });
-
-    // Theme
-    document.getElementById('btnSaveTheme').addEventListener('click', () => {
-      saveThemeVars();
-      refreshThemeJsonArea();
-      showToast('Tema guardado');
-    });
-
-    document.getElementById('btnResetTheme').addEventListener('click', () => {
-      themeVars = { ...DEFAULT_THEME_VARS };
-      applyThemeVars(themeVars);
-      saveThemeVars();
-      syncThemePickersFromVars();
-      refreshThemeJsonArea();
-      showToast('Tema restaurado');
-    });
-
-    document.getElementById('btnApplyThemeJson').addEventListener('click', () => {
-      try{
-        const obj = JSON.parse(themeJsonArea.value);
-        const vars = normalizeThemeImport(obj);
-        setThemeFromVars(vars, {merge:false});
-        showToast('Tema JSON aplicado ✅');
-      } catch {
-        showToast('JSON inválido ⚠️');
+    authBtn.addEventListener('click',()=>{
+      const u=authUser.value.trim();
+      const p=authPass.value.trim();
+      if(!u||!p){authMsg.textContent='Completa usuario y contraseña';authMsg.style.display='block';return;}
+      const storedUser=localStorage.getItem(STORAGE_USER);
+      const storedPwd=localStorage.getItem(STORAGE_PWD);
+      if(!storedUser){
+        // Crear cuenta
+        localStorage.setItem(STORAGE_USER,u);
+        localStorage.setItem(STORAGE_PWD,hash(p));
+        authGate.classList.add('hidden');
+        appEl.classList.remove('hidden');
+        initGame();
+      }else{
+        // Iniciar sesión
+        if(u===storedUser && hash(p)===storedPwd){
+          authGate.classList.add('hidden');
+          appEl.classList.remove('hidden');
+          initGame();
+        }else{
+          authMsg.textContent='Credenciales incorrectas';authMsg.style.display='block';
+        }
       }
     });
 
-    document.getElementById('btnCopyThemeJson').addEventListener('click', copyThemeJson);
-    document.getElementById('btnExportThemeJson').addEventListener('click', exportThemeJsonFile);
-
-    document.getElementById('btnImportThemeJson').addEventListener('click', () => themeFile.click());
-    themeFile.addEventListener('change', (e) => {
-      const file = e.target.files && e.target.files[0];
-      if(!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
+    // Juego
+    function initGame(){
+      // Cargar configuración guardada
+      const saved=localStorage.getItem(STORAGE_SETTINGS);
+      if(saved){
         try{
-          const obj = JSON.parse(String(reader.result || ''));
-          const vars = normalizeThemeImport(obj);
-          setThemeFromVars(vars, {merge:false});
-          showToast('Tema importado ✅');
-        } catch {
-          showToast('Archivo JSON inválido ⚠️');
-        }
-      };
-      reader.readAsText(file);
-      themeFile.value = '';
-    });
-
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Game logic
-    // ─────────────────────────────────────────────────────────────────────────────
-
-    function winner(board){
-      for(const line of LINES){
-        const [a,b,c] = line;
-        if(board[a] && board[a]===board[b] && board[a]===board[c]) return { w: board[a], line };
+          const obj=JSON.parse(saved);
+          Object.assign(state.settings,obj);
+        }catch(e){}
       }
-      if(board.every(Boolean)) return { w: 'D', line: null };
-      return null;
-    }
-
-    function isAITurn(){
-      if(settings.mode==='pvp') return false;
-      if(settings.mode==='aivai') return true;
-      return state.turn !== settings.human;
-    }
-
-    function isHumanTurn(){
-      if(settings.mode==='pvp') return true;
-      if(settings.mode==='aivai') return false;
-      return state.turn === settings.human;
-    }
-
-    function setTurnMark(){
-      turnMarkEl.textContent = state.turn;
-      turnMarkEl.style.color = (state.turn==='X') ? 'var(--x)' : 'var(--o)';
-    }
-
-    function renderBoard(){
-      boardEl.innerHTML = '';
-      const w = winner(state.board);
-      const winSet = new Set((w && w.line) ? w.line : []);
-
+      applySettingsToUI();
+      applyThemeToUI();
+      applySoundToUI();
+      applyCssVars();
+      // Construir tablero
+      boardEl.innerHTML='';
+      state.board=Array(9).fill('');
       for(let i=0;i<9;i++){
-        const cell = document.createElement('div');
-        cell.className = 'cell';
-        if(winSet.has(i)) cell.classList.add('win');
-
-        const v = state.board[i];
-        if(v){
-          cell.textContent = v;
-          cell.classList.add('disabled');
-          cell.classList.add(v==='X' ? 'markX' : 'markO');
-        } else {
-          if(state.locked || (!isHumanTurn() && settings.mode!=='pvp')) cell.classList.add('disabled');
-          cell.addEventListener('click', () => playAt(i));
-        }
-
+        const cell=document.createElement('div');
+        cell.className='cell';
+        cell.dataset.index=i;
+        cell.addEventListener('click',()=>handleCell(i));
         boardEl.appendChild(cell);
       }
-
-      sxEl.textContent = String(state.scores.X);
-      soEl.textContent = String(state.scores.O);
-      sdEl.textContent = String(state.scores.D);
-
-      setTurnMark();
+      updateUI();
+      maybeAiTurn();
     }
 
-    function playAt(i){
-      if(state.locked) return;
+    function handleCell(i){
+      if(!state.playing) return;
       if(state.board[i]) return;
-      if(!isHumanTurn() && settings.mode!=='pvp') return;
-
-      state.board[i] = state.turn;
-      if(settings.sound==='on') beep(520, 0.06);
-
-      const res = winner(state.board);
-      if(res){
-        endRound(res.w);
-      } else {
-        state.turn = (state.turn==='X') ? 'O' : 'X';
-        renderBoard();
-        scheduleAIMove();
+      state.board[i]=state.turn;
+      state.lastMove=i;
+      updateUI();
+      if(checkWinner(state.turn)){
+        state.playing=false;
+        if(state.turn==='X') state.scores.X++; else state.scores.O++;
+        updateScore();
+        setTimeout(()=>nextRound(),800);
+        playSfx('win');
+        return;
       }
-    }
-
-    function endRound(w){
-      state.locked = true;
-      if(w==='D'){
+      if(state.board.every(v=>v)){
+        state.playing=false;
         state.scores.D++;
-        showToast('Empate 🤝');
-        if(settings.sound==='on') beep(240, 0.08);
-      } else {
-        state.scores[w]++;
-        showToast(`Gana ${w} 🏆`);
-        if(settings.sound==='on') beep(w==='X' ? 320 : 420, 0.10);
+        updateScore();
+        setTimeout(()=>nextRound(),800);
+        playSfx('draw');
+        return;
       }
-      saveJSON('triki-scores', state.scores);
-      renderBoard();
+      // Cambiar turno
+      state.turn=state.turn==='X'?'O':'X';
+      updateTurnUI();
+      maybeAiTurn();
+    }
 
-      if(settings.mode==='aivai'){
-        clearTimeout(endRound._t);
-        endRound._t = setTimeout(() => newRound(true), 650);
+    function checkWinner(player){
+      const b=state.board;
+      const wins=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+      return wins.some(([a,b2,c])=>b[a]===player && b[b2]===player && b[c]===player);
+    }
+    function nextRound(){
+      state.board=Array(9).fill('');
+      state.playing=true;
+      state.turn='X';
+      state.lastMove=null;
+      updateUI();
+      maybeAiTurn();
+    }
+    function resetGame(){
+      state.scores={X:0,O:0,D:0};
+      nextRound();
+    }
+    // IA simple: mueve aleatoriamente
+    function aiMove(){
+      const empty=state.board.map((v,i)=>v?null:i).filter(v=>v!==null);
+      if(!empty.length) return;
+      const idx=empty[Math.floor(Math.random()*empty.length)];
+      handleCell(idx);
+    }
+    function maybeAiTurn(){
+      if(!state.playing) return;
+      if(state.settings.mode==='pvsp') return;
+      const isAiTurn=(state.settings.mode==='pvai' && state.turn==='O') || (state.settings.mode==='aivsa');
+      if(isAiTurn){
+        setTimeout(()=>{
+          aiMove();
+          if(state.settings.mode==='aivsa' && state.playing){
+            // en autoplay, deja que la IA siga moviendo automáticamente
+            maybeAiTurn();
+          }
+        },state.settings.aiDelay);
       }
     }
-
-    function resetRound(keepStarter=false){
-      state.board = Array(9).fill(null);
-      state.locked = false;
-      state.turn = keepStarter ? state.turn : state.starter;
-      renderBoard();
-      scheduleAIMove();
+    // Actualizar la interfaz
+    function updateUI(){
+      const cells=boardEl.children;
+      for(let i=0;i<9;i++){
+        const cell=cells[i];
+        cell.textContent=state.board[i];
+        cell.classList.remove('markX','markO','win');
+        if(state.board[i]==='X') cell.classList.add('markX');
+        if(state.board[i]==='O') cell.classList.add('markO');
+      }
+      updateTurnUI();
     }
-
-    function newRound(autofromAI=false){
-      state.starter = (state.starter==='X') ? 'O' : 'X';
-      state.turn = state.starter;
-      state.board = Array(9).fill(null);
-      state.locked = false;
-      renderBoard();
-      if(!autofromAI) showToast('Nueva ronda');
-      scheduleAIMove();
+    function updateTurnUI(){
+      turnMark.textContent=state.turn;
     }
-
-    function resetAll(){
-      state.scores = { X: 0, O: 0, D: 0 };
-      saveJSON('triki-scores', state.scores);
-      state.starter = 'X';
-      state.turn = 'X';
-      state.board = Array(9).fill(null);
-      state.locked = false;
-      renderBoard();
-      showToast('Reiniciado todo');
-      scheduleAIMove();
+    function updateScore(){
+      scoreX.textContent=state.scores.X;
+      scoreO.textContent=state.scores.O;
+      scoreD.textContent=state.scores.D;
     }
-
-    document.getElementById('btnResetRound').addEventListener('click', () => {
-      resetRound(true);
-      showToast('Reiniciado');
+    // Aplicar configuración CSS
+    function applyCssVars(){
+      const r=document.documentElement.style;
+      r.setProperty('--cell-gap',state.settings.cellGap+'px');
+      r.setProperty('--cell-radius',state.settings.cellRadius+'px');
+      r.setProperty('--cell-size',state.settings.cellSize?state.settings.cellSize+'px':state.settings.cellRadius*4+'px');
+      r.setProperty('--mark-scale',state.settings.markScale);
+      r.setProperty('--x',state.settings.xColor);
+      r.setProperty('--o',state.settings.oColor);
+      r.setProperty('--bg1',state.settings.theme.bg1);
+      r.setProperty('--bg2',state.settings.theme.bg2);
+      r.setProperty('--panel',state.settings.theme.panel);
+      r.setProperty('--panel2',state.settings.theme.panel2);
+      r.setProperty('--anim-enabled',state.settings.anim?1:0);
+      document.body.classList.toggle('anim-off',!state.settings.anim);
+    }
+    // Ajustes -> cargar valores en formulario
+    function applySettingsToUI(){
+      modeSelect.value=state.settings.mode;
+      aiDelay.value=state.settings.aiDelay;
+      animEnabled.checked=state.settings.anim;
+      gapInput.value=state.settings.cellGap;
+      radiusInput.value=state.settings.cellRadius;
+      markScaleInput.value=state.settings.markScale;
+      colorX.value=state.settings.xColor;
+      colorO.value=state.settings.oColor;
+    }
+    // Tema -> cargar valores
+    function applyThemeToUI(){
+      themeBg1.value=state.settings.theme.bg1;
+      themeBg2.value=state.settings.theme.bg2;
+      themePanel.value=state.settings.theme.panel;
+      themePanel2.value=state.settings.theme.panel2;
+      // actualizar json
+      updateThemeJson();
+    }
+    function applySoundToUI(){
+      soundEnabled.checked=state.settings.sound.enabled;
+      soundVolume.value=state.settings.sound.volume;
+    }
+    // Guardar configuración
+    function saveSettings(){
+      localStorage.setItem(STORAGE_SETTINGS,JSON.stringify(state.settings));
+    }
+    // Sonido simple con Web Audio API
+    let audioCtx;
+    function playTone(freq,dur){
+      if(!state.settings.sound.enabled) return;
+      if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+      const osc=audioCtx.createOscillator();
+      const gain=audioCtx.createGain();
+      osc.type='square';
+      osc.frequency.value=freq;
+      gain.gain.value=state.settings.sound.volume;
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime+dur);
+    }
+    function playSfx(type){
+      if(type==='win') playTone(440,0.3);
+      else if(type==='draw') playTone(180,0.2);
+      else playTone(300,0.1);
+    }
+    // Eventos botones de navegación
+    function closeAllModals(){
+      settingsModal.classList.remove('active');
+      themeModal.classList.remove('active');
+      soundModal.classList.remove('active');
+    }
+    homeBtn.addEventListener('click',()=>{closeAllModals();homeBtn.classList.add('active');settingsBtn.classList.remove('active');themeBtn.classList.remove('active');soundBtn.classList.remove('active');});
+    settingsBtn.addEventListener('click',()=>{closeAllModals();settingsModal.classList.add('active');settingsBtn.classList.add('active');homeBtn.classList.remove('active');themeBtn.classList.remove('active');soundBtn.classList.remove('active');});
+    themeBtn.addEventListener('click',()=>{closeAllModals();themeModal.classList.add('active');themeBtn.classList.add('active');homeBtn.classList.remove('active');settingsBtn.classList.remove('active');soundBtn.classList.remove('active');});
+    soundBtn.addEventListener('click',()=>{closeAllModals();soundModal.classList.add('active');soundBtn.classList.add('active');homeBtn.classList.remove('active');settingsBtn.classList.remove('active');themeBtn.classList.remove('active');});
+    // Cerrar con botón ✕
+    document.getElementById('closeSettings').onclick=()=>{settingsModal.classList.remove('active');settingsBtn.classList.remove('active');homeBtn.classList.add('active');};
+    document.getElementById('closeTheme').onclick=()=>{themeModal.classList.remove('active');themeBtn.classList.remove('active');homeBtn.classList.add('active');};
+    document.getElementById('closeSound').onclick=()=>{soundModal.classList.remove('active');soundBtn.classList.remove('active');homeBtn.classList.add('active');};
+    // Botones principales
+    document.getElementById('btnReset').onclick=()=>{nextRound();};
+    document.getElementById('btnNext').onclick=()=>{nextRound();};
+    document.getElementById('btnResetAll').onclick=()=>{resetGame();};
+    // Aplicar y restaurar ajustes
+    applySettingsBtn.addEventListener('click',()=>{
+      state.settings.mode=modeSelect.value;
+      state.settings.aiDelay=parseInt(aiDelay.value)||600;
+      state.settings.anim=animEnabled.checked;
+      state.settings.cellGap=parseInt(gapInput.value)||18;
+      state.settings.cellRadius=parseInt(radiusInput.value)||18;
+      state.settings.markScale=parseFloat(markScaleInput.value)||1;
+      state.settings.xColor=colorX.value;
+      state.settings.oColor=colorO.value;
+      applyCssVars();
+      saveSettings();
+      nextRound();
     });
-    document.getElementById('btnNewRound').addEventListener('click', () => newRound(false));
-    document.getElementById('btnResetAll').addEventListener('click', resetAll);
-
-    // ─────────────────────────────────────────────────────────────────────────────
-    // AI
-    // ─────────────────────────────────────────────────────────────────────────────
-
-    function opponent(m){ return m==='X' ? 'O' : 'X'; }
-
-    function legalMoves(board){
-      const moves = [];
-      for(let i=0;i<9;i++) if(!board[i]) moves.push(i);
-      return moves;
+    resetSettingsBtn.addEventListener('click',()=>{
+      state.settings={...state.settings,mode:'pvsp',aiDelay:600,anim:true,cellGap:18,cellRadius:18,markScale:1,xColor:'#3a3f95',oColor:'#ffffff'};
+      applySettingsToUI();
+      applyCssVars();
+      saveSettings();
+      nextRound();
+    });
+    // Tema: aplicar y resetear
+    applyThemeBtn.addEventListener('click',()=>{
+      state.settings.theme.bg1=themeBg1.value;
+      state.settings.theme.bg2=themeBg2.value;
+      state.settings.theme.panel=themePanel.value;
+      state.settings.theme.panel2=themePanel2.value;
+      applyCssVars();
+      applyThemeToUI();
+      saveSettings();
+    });
+    resetThemeBtn.addEventListener('click',()=>{
+      state.settings.theme={bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0'};
+      applyCssVars();
+      applyThemeToUI();
+      saveSettings();
+    });
+    // Tema JSON helper
+    function updateThemeJson(){
+      const json={name:'Mi tema',version:1,vars:{'--bg1':state.settings.theme.bg1,'--bg2':state.settings.theme.bg2,'--panel':state.settings.theme.panel,'--panel2':state.settings.theme.panel2,'--x':state.settings.xColor,'--o':state.settings.oColor}};
+      themeJson.value=JSON.stringify(json,null,2);
     }
-
-    function scoreTerminal(res, me){
-      if(!res) return null;
-      if(res.w==='D') return 0;
-      return res.w===me ? 10 : -10;
-    }
-
-    function minimax(board, turn, me, depth){
-      const res = winner(board);
-      const terminal = scoreTerminal(res, me);
-      if(terminal !== null) return terminal;
-      if(depth<=0) return 0;
-
-      const moves = legalMoves(board);
-      const maximizing = (turn === me);
-      let best = maximizing ? -Infinity : Infinity;
-
-      for(const i of moves){
-        const nb = board.slice();
-        nb[i] = turn;
-        const val = minimax(nb, opponent(turn), me, depth-1);
-        best = maximizing ? Math.max(best, val) : Math.min(best, val);
-      }
-      return best;
-    }
-
-    function pickAIMove(){
-      const me = state.turn;
-      const moves = legalMoves(state.board);
-      if(moves.length===0) return null;
-
-      if(settings.difficulty==='easy'){
-        return moves[Math.floor(Math.random()*moves.length)];
-      }
-
-      const depth = settings.difficulty==='hard' ? 9 : 4;
-      let bestScore = -Infinity;
-      let bestMoves = [];
-
-      for(const i of moves){
-        const nb = state.board.slice();
-        nb[i] = me;
-        const s = minimax(nb, opponent(me), me, depth);
-        if(s > bestScore){ bestScore = s; bestMoves = [i]; }
-        else if(s === bestScore){ bestMoves.push(i); }
-      }
-
-      if(settings.difficulty==='normal' && bestMoves.length>1){
-        return bestMoves[Math.floor(Math.random()*bestMoves.length)];
-      }
-      return bestMoves[0];
-    }
-
-    function scheduleAIMove(){
-      clearTimeout(scheduleAIMove._t);
-      if(state.locked) return;
-      if(!isAITurn()) return;
-
-      scheduleAIMove._t = setTimeout(() => {
-        if(state.locked) return;
-        if(!isAITurn()) return;
-
-        const i = pickAIMove();
-        if(i===null || state.board[i]) return;
-
-        state.board[i] = state.turn;
-        if(settings.sound==='on') beep(420, 0.06);
-
-        const res = winner(state.board);
-        if(res){
-          endRound(res.w);
-        } else {
-          state.turn = opponent(state.turn);
-          renderBoard();
-          scheduleAIMove();
-        }
-      }, clamp(Number(settings.thinkMs||0), 0, 2000));
-    }
-
-    // tiny beep
-    let audioCtx = null;
-    function beep(freq=440, sec=0.06){
+    applyThemeJsonBtn.addEventListener('click',()=>{
       try{
-        if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const o = audioCtx.createOscillator();
-        const g = audioCtx.createGain();
-        o.type = 'sine';
-        o.frequency.value = freq;
-        o.connect(g);
-        g.connect(audioCtx.destination);
-        g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.08, audioCtx.currentTime + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + sec);
-        o.start();
-        o.stop(audioCtx.currentTime + sec + 0.02);
-      }catch{}
-    }
-
-    // Init
-    applyThemeVars(themeVars);
-    renderPresets();
-    syncThemePickersFromVars();
-    refreshThemeJsonArea();
-
-    const savedScores = loadJSON('triki-scores', null);
-    if(savedScores && typeof savedScores.X==='number') state.scores = savedScores;
-
-    syncSettingsUI();
-    renderBoard();
-    scheduleAIMove();
-
-    // Keyboard shortcuts (desktop)
-    window.addEventListener('keydown', (e) => {
-      if(e.key.toLowerCase()==='r') resetRound(true);
-      if(e.key.toLowerCase()==='n') newRound(false);
-      if(e.key==='Escape') closeModal();
+        const obj=JSON.parse(themeJson.value);
+        const vars=obj.vars||obj;
+        if(vars['--bg1']) state.settings.theme.bg1=vars['--bg1'];
+        if(vars['--bg2']) state.settings.theme.bg2=vars['--bg2'];
+        if(vars['--panel']) state.settings.theme.panel=vars['--panel'];
+        if(vars['--panel2']) state.settings.theme.panel2=vars['--panel2'];
+        if(vars['--x']) state.settings.xColor=vars['--x'];
+        if(vars['--o']) state.settings.oColor=vars['--o'];
+        applyCssVars();
+        applySettingsToUI();
+        applyThemeToUI();
+        saveSettings();
+      }catch(e){alert('JSON inválido');}
+    });
+    copyThemeJsonBtn.addEventListener('click',()=>{
+      navigator.clipboard.writeText(themeJson.value).then(()=>{alert('Tema copiado en el portapapeles');});
+    });
+    exportThemeJsonBtn.addEventListener('click',()=>{
+      const blob=new Blob([themeJson.value],{type:'application/json'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;
+      a.download='triki-theme.json';
+      a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+    });
+    importThemeJsonBtn.addEventListener('click',()=>{importThemeFile.click();});
+    importThemeFile.addEventListener('change',e=>{
+      const file=e.target.files[0];
+      if(!file) return;
+      const reader=new FileReader();
+      reader.onload=function(ev){themeJson.value=ev.target.result;applyThemeJsonBtn.click();};
+      reader.readAsText(file);
+    });
+    // Sonido
+    applySoundBtn.addEventListener('click',()=>{
+      state.settings.sound.enabled=soundEnabled.checked;
+      state.settings.sound.volume=parseFloat(soundVolume.value)||0.2;
+      saveSettings();
+    });
+    // Guardar tema/json al cambiar colores
+    themeBg1.addEventListener('change',updateThemeJson);
+    themeBg2.addEventListener('change',updateThemeJson);
+    themePanel.addEventListener('change',updateThemeJson);
+    themePanel2.addEventListener('change',updateThemeJson);
+    colorX.addEventListener('change',()=>{state.settings.xColor=colorX.value;applyCssVars();updateThemeJson();saveSettings();});
+    colorO.addEventListener('change',()=>{state.settings.oColor=colorO.value;applyCssVars();updateThemeJson();saveSettings();});
+    // Iniciar autenticación cuando cargue la página
+    document.addEventListener('DOMContentLoaded',()=>{
+      checkAuth();
     });
   </script>
 </body>
