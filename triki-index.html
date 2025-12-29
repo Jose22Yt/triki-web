@@ -52,6 +52,12 @@
       --anim-enabled:1;
       /* Sonido */
       --volume:0.2;
+      /* Colores para la barra de navegación inferior y botones de navegación. Se actualizan dinámicamente
+         en función de si existe un wallpaper o no (ver applyCssVars). Establecemos valores iniciales para
+         evitar que queden sin definir. */
+      --navBg: rgba(0,0,0,.25);
+      --navBtnBg: rgba(0,0,0,.32);
+      --navBtnBgActive: rgba(0,0,0,.45);
       /* Navegación inferior */
       --navH:78px;
     }
@@ -474,8 +480,11 @@
       <button id="clearWallpaper">Quitar fondo</button>
       <input type="file" id="wallpaperInput" accept="image/*" style="display:none;" />
       <!-- El fondo se aplica completo; control de parallax para efecto 3D -->
-      <label>Parallax (efecto 3D)
-        <input type="range" id="themeParallax" min="0" max="30" step="1" value="0" />
+      <!-- Control del efecto parallax 4D para el fondo. Este deslizador ajusta la
+           intensidad del desplazamiento del wallpaper al mover el ratón. Un
+           valor mayor aumenta el efecto 4D. -->
+      <label>Parallax (efecto 4D)
+        <input type="range" id="themeParallax" min="0" max="40" step="1" value="0" />
       </label>
 
       <!-- Botón para aplicar el tema y regresar -->
@@ -859,12 +868,24 @@ const themeParallax=document.getElementById('themeParallax');
         r.setProperty('--glass','rgba(255,255,255,.12)');
         r.setProperty('--glass2','rgba(255,255,255,.05)');
         r.setProperty('--stroke','rgba(255,255,255,.18)');
-        // Calcular colores atenuados mezclando el color base con transparencia. El valor indica el peso del color original frente a la transparencia.
-        const lighten = (col, pct) => `color-mix(in srgb, ${col} ${pct * 100}%, transparent)`;
-        r.setProperty('--panel', lighten(basePanel1, 0.5));
-        r.setProperty('--panel2', lighten(basePanel2, 0.4));
-        r.setProperty('--x', lighten(baseX, 0.6));
-        r.setProperty('--o', lighten(baseO, 0.6));
+        // Calcular colores atenuados mezclando el color base con transparencia. En lugar de usar color-mix,
+        // utilizamos la función hexToRgba que convierte un código HEX en RGBA y nos permite ajustar la opacidad.
+        // Esto garantiza que el efecto funcione de manera consistente en todos los navegadores.
+        const lighten = (col, alpha) => hexToRgba(col, alpha);
+        // Atenuar el color de los paneles principales para que el fondo sea claramente visible. Al usar un valor
+        // más bajo se logra mayor transparencia: 0.30 deja ver de forma nítida el wallpaper; 0.20 para el panel2.
+        r.setProperty('--panel', lighten(basePanel1, 0.30));
+        r.setProperty('--panel2', lighten(basePanel2, 0.20));
+        // Atenuar las fichas X y O para que no opaquen la imagen de fondo. Se utilizan valores moderados
+        // para conservar la legibilidad de las marcas sobre cualquier wallpaper.
+        r.setProperty('--x', lighten(baseX, 0.35));
+        r.setProperty('--o', lighten(baseO, 0.35));
+
+        // Oscurecer la barra de navegación y los botones de navegación cuando hay fondo para mejorar el contraste.
+        // En lugar de derivar del color del tema utilizamos tonos oscuros fijos con distintos niveles de opacidad.
+        r.setProperty('--navBg','rgba(0,0,0,.40)');
+        r.setProperty('--navBtnBg','rgba(0,0,0,.50)');
+        r.setProperty('--navBtnBgActive','rgba(0,0,0,.65)');
       } else {
         // Sin fondo personalizado: degradado base
         const grad = linearGradientWithOpacity(state.settings.theme.bg1, state.settings.theme.bg2, 1);
@@ -880,6 +901,12 @@ const themeParallax=document.getElementById('themeParallax');
         r.setProperty('--panel2', basePanel2);
         r.setProperty('--x', baseX);
         r.setProperty('--o', baseO);
+        // Restablecer colores de barra de navegación y botones basados en los paneles. Utilizamos porcentajes
+        // moderados para que armonicen con el tema por defecto.
+        const lighten = (col, alpha) => hexToRgba(col, alpha);
+        r.setProperty('--navBg', lighten(basePanel1, 0.15));
+        r.setProperty('--navBtnBg', lighten(basePanel2, 0.25));
+        r.setProperty('--navBtnBgActive', lighten(basePanel2, 0.35));
       }
       r.setProperty('--anim-enabled',state.settings.anim?1:0);
       // Ajustar la velocidad del pulso
