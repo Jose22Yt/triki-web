@@ -840,36 +840,46 @@ const themeParallax=document.getElementById('themeParallax');
       r.setProperty('--cell-radius',state.settings.cellRadius+'px');
       r.setProperty('--cell-size',state.settings.cellSize?state.settings.cellSize+'px':state.settings.cellRadius*4+'px');
       r.setProperty('--mark-scale',state.settings.markScale);
-      r.setProperty('--x',state.settings.xColor);
-      r.setProperty('--o',state.settings.oColor);
-      r.setProperty('--bg1',state.settings.theme.bg1);
-      r.setProperty('--bg2',state.settings.theme.bg2);
-      r.setProperty('--panel',state.settings.theme.panel);
-      r.setProperty('--panel2',state.settings.theme.panel2);
-      // Fondo personalizado: establecer variable y aplicar imagen de fondo al body
-      // La variable CSS --wallpaper ya no se usa; la imagen se aplica directamente al body
-      // Si hay fondo personalizado, aplicarlo tal cual; en caso contrario usar el degradado base.
+      // Guardar referencias de colores base para paneles y fichas
+      const basePanel1 = state.settings.theme.panel;
+      const basePanel2 = state.settings.theme.panel2;
+      const baseX = state.settings.xColor;
+      const baseO = state.settings.oColor;
+      // Asignar colores de fondo superiores
+      r.setProperty('--bg1', state.settings.theme.bg1);
+      r.setProperty('--bg2', state.settings.theme.bg2);
+      // Configurar fondo personalizado o degradado base
       if(state.settings.theme.wallpaper){
-        // Cuando hay fondo personalizado se aplica directamente y se ajustan las capas glass para dejar ver la imagen
+        // Aplicar la imagen de fondo directamente
         document.body.style.background = `url(${state.settings.theme.wallpaper})`;
         document.body.style.backgroundSize = 'cover';
         document.body.style.backgroundPosition = 'center';
         document.body.style.backgroundRepeat = 'no-repeat';
-        // Hacer más transparentes las capas de cristal y las líneas para que el wallpaper sea visible
+        // Hacer más transparentes las capas de cristal, líneas y paneles para que el wallpaper sea visible
         r.setProperty('--glass','rgba(255,255,255,.12)');
         r.setProperty('--glass2','rgba(255,255,255,.05)');
         r.setProperty('--stroke','rgba(255,255,255,.18)');
-      }else{
-        // Sin fondo personalizado, usar el degradado base y restaurar opacidades predeterminadas
-        const grad = linearGradientWithOpacity(state.settings.theme.bg1,state.settings.theme.bg2,1);
+        // Calcular colores atenuados mezclando el color base con transparencia. El valor indica el peso del color original frente a la transparencia.
+        const lighten = (col, pct) => `color-mix(in srgb, ${col} ${pct * 100}%, transparent)`;
+        r.setProperty('--panel', lighten(basePanel1, 0.5));
+        r.setProperty('--panel2', lighten(basePanel2, 0.4));
+        r.setProperty('--x', lighten(baseX, 0.6));
+        r.setProperty('--o', lighten(baseO, 0.6));
+      } else {
+        // Sin fondo personalizado: degradado base
+        const grad = linearGradientWithOpacity(state.settings.theme.bg1, state.settings.theme.bg2, 1);
         document.body.style.background = grad;
         document.body.style.backgroundSize = '';
         document.body.style.backgroundPosition = '';
         document.body.style.backgroundRepeat = '';
-        // Restaurar valores base de glass y bordes
+        // Restaurar valores base de glass, líneas y paneles
         r.setProperty('--glass','rgba(255,255,255,.16)');
         r.setProperty('--glass2','rgba(255,255,255,.08)');
         r.setProperty('--stroke','rgba(255,255,255,.25)');
+        r.setProperty('--panel', basePanel1);
+        r.setProperty('--panel2', basePanel2);
+        r.setProperty('--x', baseX);
+        r.setProperty('--o', baseO);
       }
       r.setProperty('--anim-enabled',state.settings.anim?1:0);
       // Ajustar la velocidad del pulso
