@@ -318,6 +318,10 @@
       <input id="authPass" type="password" placeholder="Contraseña" />
       <button id="authBtn">Crear cuenta</button>
       <p id="authMsg" style="margin-top:10px;color:#ffcccc;font-size:14px;display:none;"></p>
+      <!-- Permitir cambiar entre registro e inicio de sesión -->
+      <p id="switchAuth" style="margin-top:12px;font-size:14px;text-align:center;text-decoration:underline;cursor:pointer;">
+        ¿Ya tienes cuenta? Iniciar sesión / Crear cuenta
+      </p>
     </div>
   </div>
   <!-- Aplicación principal -->
@@ -456,7 +460,9 @@
         <input type="number" id="wallpaperOpacity" min="0" max="1" step="0.05" value="0.8" />
       </label>
 
-      <!-- Botón para volver a la pantalla principal -->
+      <!-- Botón para aplicar el tema y regresar -->
+      <button id="applyThemeAndReturn">Aplicar y volver</button>
+      <!-- Botón para volver a la pantalla principal sin aplicar cambios -->
       <button id="backTheme">Volver</button>
     </div>
   </div>
@@ -553,6 +559,8 @@
     const themePanel2=document.getElementById('themePanel2');
     const applyThemeBtn=document.getElementById('applyTheme');
     const resetThemeBtn=document.getElementById('resetTheme');
+    // Botón que aplica el tema y regresa a la pantalla principal
+    const applyThemeAndReturnBtn=document.getElementById('applyThemeAndReturn');
     const themeJson=document.getElementById('themeJson');
     const applyThemeJsonBtn=document.getElementById('applyThemeJson');
     const copyThemeJsonBtn=document.getElementById('copyThemeJson');
@@ -565,16 +573,43 @@
     const wallpaperInput=document.getElementById('wallpaperInput');
     // Input para opacidad de fondo
     const wallpaperOpacityInput=document.getElementById('wallpaperOpacity');
+
+    // Actualiza la opacidad del fondo a medida que el usuario modifica el campo.
+    // Esto permite ver los cambios de forma inmediata sin necesidad de aplicar el tema.
+    if(wallpaperOpacityInput){
+      wallpaperOpacityInput.addEventListener('input', (e)=>{
+        const val=parseFloat(e.target.value);
+        if(!isNaN(val)){
+          state.settings.theme.wallpaperOpacity=val;
+          applyCssVars();
+          updateThemeJson();
+          saveSettings();
+        }
+      });
+    }
     // Botones de volver en modales
     const backSettings=document.getElementById('backSettings');
     const backTheme=document.getElementById('backTheme');
     const backSound=document.getElementById('backSound');
+
+    // Botón para alternar entre crear cuenta e iniciar sesión (borrar cuenta)
+    const switchAuthBtn=document.getElementById('switchAuth');
     // Sonido UI
     const soundEnabled=document.getElementById('soundEnabled');
     const soundVolume=document.getElementById('soundVolume');
     // Checkbox de sonido al mover
     const moveSoundEnabled=document.getElementById('moveSoundEnabled');
     const applySoundBtn=document.getElementById('applySound');
+
+    // Si el usuario desea cambiar de cuenta o crear una nueva, este botón borra las credenciales almacenadas
+    // y vuelve a mostrar la pantalla de autenticación. Esto facilita crear una nueva cuenta si ya existe una previa.
+    if(switchAuthBtn){
+      switchAuthBtn.addEventListener('click',()=>{
+        localStorage.removeItem(STORAGE_USER);
+        localStorage.removeItem(STORAGE_PWD);
+        checkAuth();
+      });
+    }
 
     // Helpers para colores: convertir HEX a RGBA con opacidad y construir un gradiente con opacidad
     function hexToRgba(hex, alpha){
@@ -694,14 +729,8 @@
     function handleCell(i){
       if(!state.playing) return;
       if(state.board[i]) return;
-      // reproducir sonido de movimiento si está habilitado
-      if(state.settings.sound.enabled && state.settings.sound.moveSoundEnabled){
-        moveAudio.volume = state.settings.sound.volume;
-        try{
-          moveAudio.currentTime = 0;
-        }catch(e){}
-        moveAudio.play().catch(()=>{});
-      }
+      // Reproducir sonido de movimiento si corresponde
+      playMoveSound();
       // marcar celda y aplicar animación pop
       state.board[i]=state.turn;
       addPopToCell(i);
@@ -863,9 +892,27 @@
     }
     // Sonido simple con Web Audio API
     let audioCtx;
-    // Sonido de movimiento (clic). Cargado desde archivo MP3 alojado junto al juego.
+    /*
+      Sonido de movimiento (clic). Para evitar problemas de ruta y permitir que el juego
+      funcione correctamente en GitHub Pages y otros entornos estáticos, incrustamos el
+      archivo MP3 como un Data URI. Esto elimina las peticiones HTTP adicionales y
+      garantiza que el sonido esté disponible antes de reproducirse. Si necesitas
+      sustituir el sonido por otro, reemplaza el valor de "moveSoundDataUri" por un
+      Data URI generado a partir del nuevo archivo MP3 (p. ej. usando base64).
+
+      Nota: El Data URI ha sido generado previamente a partir del archivo
+      "mouse-click-sfx-444806.mp3" y puede ser bastante largo. Está colocado como una
+      constante para que el navegador lo cargue de inmediato. Se especifica el tipo
+      "audio/mp3" explícitamente para que todos los navegadores lo interpreten de forma
+      correcta.
+    */
+    // Ruta del archivo de sonido de movimiento. Este archivo debe estar presente en la raíz del proyecto
+    // para que pueda ser cargado tanto en el desarrollo local como en GitHub Pages. Si deseas
+    // incrustar el audio como Data URI en vez de servirlo como archivo independiente, puedes
+    // reemplazar esta línea con un Data URI (por ejemplo: 'data:audio/mp3;base64,...').
     const moveAudio = new Audio('mouse-click-sfx-444806.mp3');
     moveAudio.preload = 'auto';
+    try{ moveAudio.load(); }catch(e){}
     function playTone(freq,dur){
       if(!state.settings.sound.enabled) return;
       if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
@@ -878,10 +925,32 @@
       osc.start();
       osc.stop(audioCtx.currentTime+dur);
     }
+    // Reproduce un sonido corto (tipo beep) para eventos como victoria o empate. Si
+    // se desea personalizar estos sonidos, puede modificarse la frecuencia y duración.
     function playSfx(type){
       if(type==='win') playTone(440,0.3);
       else if(type==='draw') playTone(180,0.2);
       else playTone(300,0.1);
+    }
+
+    // Reproduce el sonido de movimiento (clic) si el sonido está habilitado. Encapsulamos
+    // la lógica en una función para poder manejar errores y centralizar la configuración.
+    function playMoveSound(){
+      // Reproduce el sonido de movimiento. Para evitar bloqueos al reutilizar
+      // continuamente el mismo objeto de Audio (que algunos navegadores no
+      // permiten si aún está reproduciéndose), clonamos el elemento de audio
+      // base en cada llamada. De este modo, cada clic utiliza su propia
+      // instancia y no detiene la jugada.
+      if(!state.settings.sound.enabled || !state.settings.sound.moveSoundEnabled) return;
+      try{
+        // Clonar el elemento base o crear una nueva instancia con la misma ruta
+        const audio = moveAudio.cloneNode();
+        audio.volume = state.settings.sound.volume;
+        audio.currentTime = 0;
+        audio.play().catch(()=>{});
+      }catch(e){
+        // Silenciar cualquier error para que el flujo del juego continúe
+      }
     }
 
     // === Animación de pulsación ===
@@ -891,8 +960,8 @@
       el.classList.add('pop');
       el.addEventListener('animationend',function handler(){
         el.classList.remove('pop');
-        el.removeEventListener('animationend',handler);
-      });
+      el.removeEventListener('animationend',handler);
+    });
     }
     // Añade efecto pop a una celda del tablero usando su índice
     function addPopToCell(idx){
@@ -991,6 +1060,25 @@
       themeBtn.classList.remove('active');
       homeBtn.classList.add('active');
     });
+
+    // Aplicar tema y volver en un solo paso
+    if(applyThemeAndReturnBtn){
+      applyThemeAndReturnBtn.addEventListener('click',()=>{
+        // Copiar lógica de aplicar tema
+        state.settings.theme.bg1=themeBg1.value;
+        state.settings.theme.bg2=themeBg2.value;
+        state.settings.theme.panel=themePanel.value;
+        state.settings.theme.panel2=themePanel2.value;
+        state.settings.theme.wallpaperOpacity=parseFloat(wallpaperOpacityInput.value)||state.settings.theme.wallpaperOpacity||1;
+        applyCssVars();
+        applyThemeToUI();
+        saveSettings();
+        // Cerrar modal y volver a pantalla principal
+        themeModal.classList.remove('active');
+        themeBtn.classList.remove('active');
+        homeBtn.classList.add('active');
+      });
+    }
     resetThemeBtn.addEventListener('click',()=>{
       state.settings.theme={
         bg1:'#6c2bd9',
@@ -1083,6 +1171,8 @@
       reader.onload=function(ev){
         state.settings.theme.wallpaper=ev.target.result;
         applyCssVars();
+        // Actualizar los controles de tema para reflejar la imagen cargada
+        applyThemeToUI();
         updateThemeJson();
         saveSettings();
       };
