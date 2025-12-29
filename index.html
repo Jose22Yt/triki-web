@@ -192,6 +192,12 @@
     .btn.smallText{font-size:22px;}
     /* Marcador */
     .score{margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+    /* Animación de victoria y confeti */
+    .winOverlay{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:1000;}
+    .winOverlay .message{font-size:48px;font-weight:700;color:var(--text);text-shadow:0 0 12px rgba(0,0,0,.4);animation:popWin .6s ease forwards;}
+    @keyframes popWin{0%{transform:scale(0.5);opacity:0;}100%{transform:scale(1);opacity:1;}}
+    .confetti{position:fixed;width:8px;height:8px;border-radius:50%;opacity:0;animation:confFall linear;}
+    @keyframes confFall{0%{transform:translateY(-10px) rotate(0deg);opacity:1;}100%{transform:translateY(100vh) rotate(360deg);opacity:0;}}
     .scoreCard{
       border-radius:18px;
       padding:14px 12px;
@@ -467,10 +473,7 @@
       <button id="selectWallpaper">Seleccionar imagen</button>
       <button id="clearWallpaper">Quitar fondo</button>
       <input type="file" id="wallpaperInput" accept="image/*" style="display:none;" />
-      <!-- Opacidad de fondo -->
-      <label>Opacidad de fondo
-        <input type="number" id="wallpaperOpacity" min="0" max="1" step="0.05" value="0.8" />
-      </label>
+      <!-- Se eliminó el control de opacidad: el fondo se aplica completo -->
 
       <!-- Botón para aplicar el tema y regresar -->
       <button id="applyThemeAndReturn">Aplicar y volver</button>
@@ -517,7 +520,7 @@
         markScale:1,
         xColor:'#3a3f95',
         oColor:'#ffffff',
-        theme:{bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0',wallpaper:'',wallpaperOpacity:0.8},
+        theme:{bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0',wallpaper:''},
         sound:{enabled:true,volume:0.2,moveSoundEnabled:true}
       },
       lastMove:null,
@@ -583,22 +586,7 @@
     const selectWallpaper=document.getElementById('selectWallpaper');
     const clearWallpaper=document.getElementById('clearWallpaper');
     const wallpaperInput=document.getElementById('wallpaperInput');
-    // Input para opacidad de fondo
-    const wallpaperOpacityInput=document.getElementById('wallpaperOpacity');
-
-    // Actualiza la opacidad del fondo a medida que el usuario modifica el campo.
-    // Esto permite ver los cambios de forma inmediata sin necesidad de aplicar el tema.
-    if(wallpaperOpacityInput){
-      wallpaperOpacityInput.addEventListener('input', (e)=>{
-        const val=parseFloat(e.target.value);
-        if(!isNaN(val)){
-          state.settings.theme.wallpaperOpacity=val;
-          applyCssVars();
-          updateThemeJson();
-          saveSettings();
-        }
-      });
-    }
+    // Se eliminaron los controles y listeners de opacidad de fondo; la imagen se aplica completa
     // Botones de volver en modales
     const backSettings=document.getElementById('backSettings');
     const backTheme=document.getElementById('backTheme');
@@ -761,6 +749,8 @@
         updateScore();
         setTimeout(()=>nextRound(),800);
         playSfx('win');
+        // Mostrar animación de victoria con confeti
+        showWinAnimation(state.turn);
         return;
       }
       if(state.board.every(v=>v)){
@@ -769,6 +759,8 @@
         updateScore();
         setTimeout(()=>nextRound(),800);
         playSfx('draw');
+        // Mostrar animación de empate
+        showWinAnimation('draw');
         return;
       }
       // Cambiar turno
@@ -849,23 +841,15 @@
       r.setProperty('--panel',state.settings.theme.panel);
       r.setProperty('--panel2',state.settings.theme.panel2);
       // Fondo personalizado: establecer variable y aplicar imagen de fondo al body
+      // La variable CSS --wallpaper ya no se usa; la imagen se aplica directamente al body
+      // Si hay fondo personalizado, aplicarlo tal cual; en caso contrario usar el degradado base.
       if(state.settings.theme.wallpaper){
-        r.setProperty('--wallpaper',`url(${state.settings.theme.wallpaper})`);
-      }else{
-        r.setProperty('--wallpaper','none');
-      }
-      // Aplicar imagen de fondo directamente para garantizar que se vea
-      // Usar opacidad configurable para el gradiente
-      const opacity = (typeof state.settings.theme.wallpaperOpacity === 'number' ? state.settings.theme.wallpaperOpacity : 1);
-      const grad = linearGradientWithOpacity(state.settings.theme.bg1,state.settings.theme.bg2,opacity);
-      if(state.settings.theme.wallpaper){
-        // Establecer fondo compuesto: degradado con opacidad + imagen
-        document.body.style.background = `${grad}, url(${state.settings.theme.wallpaper})`;
+        document.body.style.background = `url(${state.settings.theme.wallpaper})`;
         document.body.style.backgroundSize = 'cover';
         document.body.style.backgroundPosition = 'center';
         document.body.style.backgroundRepeat = 'no-repeat';
       }else{
-        // Solo degradado
+        const grad = linearGradientWithOpacity(state.settings.theme.bg1,state.settings.theme.bg2,1);
         document.body.style.background = grad;
         document.body.style.backgroundSize = '';
         document.body.style.backgroundPosition = '';
@@ -896,11 +880,7 @@
       themePanel2.value=state.settings.theme.panel2;
       // actualizar json
       updateThemeJson();
-
-      // actualizar controles de opacidad de fondo
-      if(wallpaperOpacityInput) {
-        wallpaperOpacityInput.value = state.settings.theme.wallpaperOpacity ?? 1;
-      }
+      // No se actualiza control de opacidad de fondo porque se eliminó
     }
     function applySoundToUI(){
       soundEnabled.checked=state.settings.sound.enabled;
@@ -1007,6 +987,34 @@
         btn.addEventListener('click',()=>{addPop(btn);});
       });
     }
+
+    // Colores para los confetis de la animación de victoria
+    const confColors=['#ff5e8c','#ffc94d','#5effa1','#6ecbff','#e4ff56'];
+    // Muestra una animación de victoria o empate. Crea un overlay con mensaje y confeti y lo elimina tras unos segundos.
+    function showWinAnimation(winner){
+      const overlay=document.createElement('div');
+      overlay.className='winOverlay';
+      const msg=document.createElement('div');
+      msg.className='message';
+      if(winner==='draw'){
+        msg.textContent='¡Empate!';
+      }else{
+        msg.textContent = winner==='X' ? '¡X gana!' : '¡O gana!';
+      }
+      overlay.appendChild(msg);
+      // Crear partículas de confeti
+      for(let i=0;i<30;i++){
+        const conf=document.createElement('div');
+        conf.className='confetti';
+        conf.style.left=(Math.random()*100)+'vw';
+        conf.style.backgroundColor=confColors[Math.floor(Math.random()*confColors.length)];
+        conf.style.animationDuration=(2+Math.random())+'s';
+        overlay.appendChild(conf);
+      }
+      document.body.appendChild(overlay);
+      // Eliminar después de 3 segundos
+      setTimeout(()=>{overlay.remove();},3000);
+    }
     // Eventos botones de navegación
     function closeAllModals(){
       settingsModal.classList.remove('active');
@@ -1073,8 +1081,6 @@
       state.settings.theme.bg2=themeBg2.value;
       state.settings.theme.panel=themePanel.value;
       state.settings.theme.panel2=themePanel2.value;
-      // guardar opacidad de fondo
-      state.settings.theme.wallpaperOpacity=parseFloat(wallpaperOpacityInput.value)||state.settings.theme.wallpaperOpacity||1;
       applyCssVars();
       applyThemeToUI();
       saveSettings();
@@ -1093,7 +1099,6 @@
         state.settings.theme.bg2=themeBg2.value;
         state.settings.theme.panel=themePanel.value;
         state.settings.theme.panel2=themePanel2.value;
-        state.settings.theme.wallpaperOpacity=parseFloat(wallpaperOpacityInput.value)||state.settings.theme.wallpaperOpacity||1;
         applyCssVars();
         applyThemeToUI();
         saveSettings();
@@ -1109,8 +1114,7 @@
         bg2:'#b02bd9',
         panel:'#ff56e0',
         panel2:'#ff7cf0',
-        wallpaper:'',
-        wallpaperOpacity:0.8
+        wallpaper:''
       };
       applyCssVars();
       applyThemeToUI();
@@ -1129,8 +1133,7 @@
         '--panel2':state.settings.theme.panel2,
         '--x':state.settings.xColor,
         '--o':state.settings.oColor,
-        '--wallpaper':state.settings.theme.wallpaper||'',
-        '--wallpaperOpacity': state.settings.theme.wallpaperOpacity ?? 1
+        '--wallpaper':state.settings.theme.wallpaper||''
       }};
       themeJson.value=JSON.stringify(json,null,2);
     }
@@ -1148,10 +1151,7 @@
           // Asignar wallpaper; si es cadena vacía se elimina
           state.settings.theme.wallpaper = vars['--wallpaper'] || '';
         }
-        if(vars['--wallpaperOpacity'] !== undefined){
-          const op = parseFloat(vars['--wallpaperOpacity']);
-          if(!isNaN(op)) state.settings.theme.wallpaperOpacity = op;
-        }
+        // Se ignora la opacidad de fondo en la importación de temas
         applyCssVars();
         applySettingsToUI();
         applyThemeToUI();
