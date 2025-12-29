@@ -162,18 +162,30 @@
     .markX{color:var(--x);text-shadow:0 10px 22px rgba(0,0,0,.20);transform:scale(var(--mark-scale));}
     .markO{color:var(--o);text-shadow:0 10px 22px rgba(0,0,0,.20);transform:scale(var(--mark-scale));}
     /* Botones */
-    .buttons{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:16px;}
+    /* Botones principales: se distribuyen automáticamente en columnas adaptables y
+       utilizan tamaños más contenidos para adaptarse mejor a pantallas móviles. */
+    .buttons{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:14px;
+    }
+    /* Ajustar solo los botones principales dentro de .buttons para que se distribuyan en 3 columnas */
+    .buttons .btn{
+      flex:1 1 calc(33.333% - 8px);
+      min-width:90px;
+    }
     .btn{
       border-radius:18px;
-      padding:18px 12px;
+      padding:14px 10px;
       border:var(--board-border) solid color-mix(in srgb,var(--stroke) 60%,transparent);
       background:color-mix(in srgb,var(--glass2) 100%,transparent);
       color:var(--text);
-      font-weight:900;
-      font-size:28px;
-      box-shadow:0 16px 34px rgba(0,0,0,.14);
+      font-weight:700;
+      font-size:20px;
+      box-shadow:0 12px 28px rgba(0,0,0,.14);
       cursor:pointer;
-      transition:transform .15s ease, background .18s ease, border-color .18s ease;
+      transition:transform .18s cubic-bezier(.22,1,.36,1), background .20s ease, border-color .20s ease;
     }
     .btn:hover{transform:translateY(-1px);background:color-mix(in srgb,var(--glass) 78%,transparent);border-color:color-mix(in srgb,var(--stroke) 80%,transparent);}
     .btn:active{transform:translateY(0px) scale(.98);}
@@ -643,12 +655,19 @@
       authUser.value='';
       authPass.value='';
       authMsg.style.display='none';
+      // Si existe una cuenta guardada, iniciar sesión automáticamente y saltar la puerta
+      if(user && pwd){
+        authGate.classList.add('hidden');
+        appEl.classList.remove('hidden');
+        // Preparar la aplicación
+        initGame();
+        return;
+      }
+      // De lo contrario, mostrar registro/inicio de sesión según exista usuario
       if(!user||!pwd){
-        // No hay cuenta, mostrar registro
         authTitle.textContent='Crear cuenta';
         authBtn.textContent='Crear cuenta';
       }else{
-        // Hay cuenta guardada, mostrar inicio de sesión
         authTitle.textContent='Iniciar sesión';
         authBtn.textContent='Iniciar sesión';
       }
@@ -840,12 +859,14 @@
       const opacity = (typeof state.settings.theme.wallpaperOpacity === 'number' ? state.settings.theme.wallpaperOpacity : 1);
       const grad = linearGradientWithOpacity(state.settings.theme.bg1,state.settings.theme.bg2,opacity);
       if(state.settings.theme.wallpaper){
-        document.body.style.backgroundImage = `${grad}, url(${state.settings.theme.wallpaper})`;
+        // Establecer fondo compuesto: degradado con opacidad + imagen
+        document.body.style.background = `${grad}, url(${state.settings.theme.wallpaper})`;
         document.body.style.backgroundSize = 'cover';
         document.body.style.backgroundPosition = 'center';
         document.body.style.backgroundRepeat = 'no-repeat';
       }else{
-        document.body.style.backgroundImage = grad;
+        // Solo degradado
+        document.body.style.background = grad;
         document.body.style.backgroundSize = '';
         document.body.style.backgroundPosition = '';
         document.body.style.backgroundRepeat = '';
@@ -906,13 +927,18 @@
       "audio/mp3" explícitamente para que todos los navegadores lo interpreten de forma
       correcta.
     */
-    // Ruta del archivo de sonido de movimiento. Este archivo debe estar presente en la raíz del proyecto
-    // para que pueda ser cargado tanto en el desarrollo local como en GitHub Pages. Si deseas
-    // incrustar el audio como Data URI en vez de servirlo como archivo independiente, puedes
-    // reemplazar esta línea con un Data URI (por ejemplo: 'data:audio/mp3;base64,...').
-    const moveAudio = new Audio('mouse-click-sfx-444806.mp3');
-    moveAudio.preload = 'auto';
-    try{ moveAudio.load(); }catch(e){}
+    /*
+      Sonido de movimiento (clic). Para garantizar que el sonido siempre esté disponible y evitar
+      bloqueos al cargar un archivo externo (sobre todo al desplegarse en GitHub Pages),
+      incrustamos el archivo MP3 como un Data URI. El valor proviene del archivo
+      "moveSoundDataURI.txt" generado previamente. Si deseas sustituir el sonido,
+      reemplaza la siguiente cadena por el Data URI correspondiente del nuevo archivo.
+    */
+    // Ruta del sonido de clic. Se utiliza un archivo mp3 incluido en el mismo repositorio (misma ruta que index.html).
+    // Se usa un objeto Audio base y se clonará en cada reproducción para evitar interferencias entre instancias.
+    const moveAudioBase = new Audio('mouse-click-sfx-444806.mp3');
+    moveAudioBase.preload = 'auto';
+    try{ moveAudioBase.load(); }catch(e){}
     function playTone(freq,dur){
       if(!state.settings.sound.enabled) return;
       if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
@@ -936,15 +962,11 @@
     // Reproduce el sonido de movimiento (clic) si el sonido está habilitado. Encapsulamos
     // la lógica en una función para poder manejar errores y centralizar la configuración.
     function playMoveSound(){
-      // Reproduce el sonido de movimiento. Para evitar bloqueos al reutilizar
-      // continuamente el mismo objeto de Audio (que algunos navegadores no
-      // permiten si aún está reproduciéndose), clonamos el elemento de audio
-      // base en cada llamada. De este modo, cada clic utiliza su propia
-      // instancia y no detiene la jugada.
+      // Reproduce el sonido de movimiento. Si el audio está deshabilitado, no hace nada.
       if(!state.settings.sound.enabled || !state.settings.sound.moveSoundEnabled) return;
       try{
-        // Clonar el elemento base o crear una nueva instancia con la misma ruta
-        const audio = moveAudio.cloneNode();
+        // Clonar el elemento base para evitar conflictos con reproducciones en curso.
+        const audio = moveAudioBase.cloneNode();
         audio.volume = state.settings.sound.volume;
         audio.currentTime = 0;
         audio.play().catch(()=>{});
@@ -958,10 +980,12 @@
     function addPop(el){
       if(!state.settings.anim) return;
       el.classList.add('pop');
-      el.addEventListener('animationend',function handler(){
+      // Definir el manejador fuera para poder eliminarlo posteriormente
+      const handler = () => {
         el.classList.remove('pop');
-      el.removeEventListener('animationend',handler);
-    });
+        el.removeEventListener('animationend', handler);
+      };
+      el.addEventListener('animationend', handler);
     }
     // Añade efecto pop a una celda del tablero usando su índice
     function addPopToCell(idx){
