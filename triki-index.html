@@ -1,329 +1,1255 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>Ultimate Triki - Juego Web</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TRIKI — Tres en Raya</title>
+  <!--
+    Juego de tres en raya (triki) con opciones avanzadas de personalización.
+    Este archivo combina todo el HTML, CSS y JavaScript en un único documento
+    para facilitar su publicación en servicios estáticos como GitHub Pages.
+    
+    Funciones implementadas:
+    - Tablero 3×3 con estilos glass/neón.
+    - IA básica con modo Jugador vs IA y IA vs IA (autoplay).
+    - Panel de ajustes para:
+        * Cambiar colores (temas) mediante variables CSS.
+        * Ajustar animaciones (activar/desactivar).
+        * Ajustar espaciado y radio de las celdas.
+        * Personalizar el tamaño de las marcas (X/O) y sus colores.
+        * Activar/desactivar sonido y ajustar volumen.
+    - Importar/exportar temas en formato JSON.
+    - Pantalla de registro/inicio de sesión local (guardada en localStorage).
+  -->
   <style>
-    :root {
-      --border-color: #333;
-      --primary-color: #007bff;
-      --background: #f9f9f9;
-      --card-bg: #fff;
-      --card-border: #e0e0e0;
-      --toast-bg: rgba(0,0,0,0.8);
-      --toast-color: #fff;
+    :root{
+      /* Colores base del fondo */
+      --bg1:#6c2bd9;
+      --bg2:#b02bd9;
+      /* Colores de los paneles */
+      --panel:#ff56e0;
+      --panel2:#ff7cf0;
+      /* Efectos glass */
+      --glass: rgba(255,255,255,.16);
+      --glass2: rgba(255,255,255,.08);
+      --stroke: rgba(255,255,255,.25);
+      /* Tipografía */
+      --text:#ffffff;
+      --muted: rgba(255,255,255,.78);
+      /* Colores de X y O */
+      --x:#3a3f95;
+      --o:#ffffff;
+      /* Imagen de fondo personalizada (url(...) o none) */
+      --wallpaper:none;
+      /* Ajustes de tablero */
+      --cell-gap:18px;
+      --cell-radius:18px;
+      --cell-size:78px;
+      --board-border:2px;
+      /* Ajuste de escala de las marcas (1 = tamaño normal) */
+      --mark-scale:1;
+      /* Animaciones: 1 = activadas, 0 = desactivadas */
+      --anim-enabled:1;
+      /* Sonido */
+      --volume:0.2;
+      /* Navegación inferior */
+      --navH:78px;
     }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: var(--background);
-      color: #222;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      min-height: 100vh;
-      padding: 1rem;
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      min-height:100vh;
+      /* Fondo degradado; la imagen personalizada se aplica dinámicamente via JS */
+      background:linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 100%);
+      background-size:cover;
+      background-position:center;
+      background-repeat:no-repeat;
+      color:var(--text);
+      display:flex;
+      justify-content:center;
+      padding:18px 14px calc(var(--navH) + 14px + env(safe-area-inset-bottom,0px));
     }
-    h1 {
-      margin-top: 0;
-      font-size: 1.5rem;
-      text-align: center;
+    .app{width:min(520px,100%);}
+    .hidden{display:none !important;}
+    /* Encabezado */
+    .top{
+      display:flex;
+      align-items:flex-start;
+      justify-content:flex-start;
+      gap:14px;
+      margin-top:8px;
     }
-    .board {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      grid-gap: 4px;
+    .title h1{margin:0;font-size:54px;letter-spacing:.5px;font-weight:900;line-height:.95;}
+    .title .sub{margin-top:10px;font-size:24px;color:var(--muted);font-weight:500;}
+    /* Tarjeta principal */
+    .card{
+      margin-top:22px;
+      border-radius:28px;
+      background:linear-gradient(180deg,color-mix(in srgb,var(--panel2) 86%,white 14%),var(--panel));
+      box-shadow:0 18px 60px rgba(0,0,0,.28);
+      border:var(--board-border) solid color-mix(in srgb,var(--glass2) 70%,transparent);
+      padding:18px;
+      position:relative;
+      overflow:hidden;
     }
-    .big-board {
-      width: 450px;
-      max-width: 100%;
-      margin: 0 auto;
-      border: 2px solid var(--border-color);
-      padding: 4px;
-      background: var(--card-bg);
+    /* Pastilla de turno */
+    .turnPillWrap{display:flex;justify-content:center;margin-top:6px;}
+    .turnPill{
+      display:inline-flex;
+      align-items:center;
+      gap:12px;
+      padding:12px 26px;
+      border-radius:999px;
+      background:color-mix(in srgb,var(--glass) 100%,transparent);
+      border:var(--board-border) solid color-mix(in srgb,var(--stroke) 90%,transparent);
+      box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--glass2) 90%,transparent);
+      font-weight:900;
+      letter-spacing:1px;
+      text-transform:uppercase;
     }
-    .small-board {
-      background: var(--background);
-      border: 1px solid var(--border-color);
-      position: relative;
+    .turnPill .mark{
+      display:inline-grid;
+      place-items:center;
+      min-width:34px;height:34px;
+      border-radius:999px;
+      background:color-mix(in srgb,var(--glass2) 100%,transparent);
+      border:var(--board-border) solid color-mix(in srgb,var(--stroke) 70%,transparent);
+      font-size:22px;font-weight:1000;
     }
-    .small-board.won::after {
-      content: attr(data-winner);
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 2.5rem;
-      color: var(--primary-color);
-      pointer-events: none;
+    /* Tablero */
+    .boardShell{
+      margin-top:18px;
+      border-radius:30px;
+      padding:18px;
+      background:color-mix(in srgb,var(--glass) 92%,transparent);
+      border:var(--board-border) solid color-mix(in srgb,var(--stroke) 70%,transparent);
+      box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--glass2) 85%,transparent);
     }
-    .cell {
-      width: 100%;
-      aspect-ratio: 1;
-      border: 1px solid var(--border-color);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.5rem;
-      cursor: pointer;
-      user-select: none;
+    .board{
+      width:100%;
+      aspect-ratio:1/1;
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:var(--cell-gap);
+      padding:10px;
+      border-radius:26px;
+      background:color-mix(in srgb,var(--glass2) 100%,transparent);
+      border:var(--board-border) solid color-mix(in srgb,var(--stroke) 65%,transparent);
     }
-    .cell.disabled { cursor: default; }
-    .controls {
-      margin-top: 1rem;
-      display: flex;
-      gap: 0.5rem;
+    .cell{
+      border-radius:var(--cell-radius);
+      background:color-mix(in srgb,var(--glass) 92%,transparent);
+      border:var(--board-border) solid color-mix(in srgb,var(--stroke) 78%,transparent);
+      box-shadow:0 18px 34px rgba(0,0,0,.10);
+      display:grid;
+      place-items:center;
+      min-height:var(--cell-size);
+      font-weight:1000;
+      font-size:clamp(34px,8vw,54px);
+      cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+      user-select:none;
+      transition:transform .15s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+      position:relative;
+      overflow:hidden;
     }
-    button {
-      padding: 0.5rem 1rem;
-      border: none;
-      background: var(--primary-color);
-      color: #fff;
-      cursor: pointer;
-      border-radius: 4px;
-      font-size: 0.9rem;
+    .anim-off .cell{transition:none !important;}
+    .cell:hover{transform:translateY(-1px);background:color-mix(in srgb,var(--glass) 110%,transparent);border-color:color-mix(in srgb,var(--stroke) 92%,transparent);}
+    .cell:active{transform:translateY(0px) scale(.98);}
+    .cell.disabled{cursor:not-allowed;opacity:.78;}
+    .cell.win{background:color-mix(in srgb,var(--glass) 145%,transparent);border-color:color-mix(in srgb,var(--stroke) 140%,transparent);box-shadow:0 24px 44px rgba(0,0,0,.16);}
+    .markX{color:var(--x);text-shadow:0 10px 22px rgba(0,0,0,.20);transform:scale(var(--mark-scale));}
+    .markO{color:var(--o);text-shadow:0 10px 22px rgba(0,0,0,.20);transform:scale(var(--mark-scale));}
+    /* Botones */
+    /* Botones principales: se distribuyen automáticamente en columnas adaptables y
+       utilizan tamaños más contenidos para adaptarse mejor a pantallas móviles. */
+    .buttons{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:14px;
     }
-    button.secondary {
-      background: #6c757d;
+    /* Ajustar solo los botones principales dentro de .buttons para que se distribuyan en 3 columnas */
+    .buttons .btn{
+      flex:1 1 calc(33.333% - 8px);
+      min-width:90px;
     }
-    #help {
-      margin-top: 1rem;
-      padding: 1rem;
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 4px;
-      display: none;
-      max-width: 450px;
+    .btn{
+      border-radius:18px;
+      padding:14px 10px;
+      border:var(--board-border) solid color-mix(in srgb,var(--stroke) 60%,transparent);
+      background:color-mix(in srgb,var(--glass2) 100%,transparent);
+      color:var(--text);
+      font-weight:700;
+      font-size:20px;
+      box-shadow:0 12px 28px rgba(0,0,0,.14);
+      cursor:pointer;
+      transition:transform .18s cubic-bezier(.22,1,.36,1), background .20s ease, border-color .20s ease;
     }
-    #toast {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--toast-bg);
-      color: var(--toast-color);
-      padding: 0.75rem 1rem;
-      border-radius: 4px;
-      display: none;
-      z-index: 9999;
+    .btn:hover{transform:translateY(-1px);background:color-mix(in srgb,var(--glass) 78%,transparent);border-color:color-mix(in srgb,var(--stroke) 80%,transparent);}
+    .btn:active{transform:translateY(0px) scale(.98);}
+    .btn.smallText{font-size:22px;}
+    /* Marcador */
+    .score{margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+    /* Animación de victoria y confeti */
+    .winOverlay{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:1000;}
+    .winOverlay .message{font-size:48px;font-weight:700;color:var(--text);text-shadow:0 0 12px rgba(0,0,0,.4);animation:popWin .6s ease forwards;}
+    @keyframes popWin{0%{transform:scale(0.5);opacity:0;}100%{transform:scale(1);opacity:1;}}
+    .confetti{position:fixed;width:8px;height:8px;border-radius:50%;opacity:0;animation:confFall linear;}
+    @keyframes confFall{0%{transform:translateY(-10px) rotate(0deg);opacity:1;}100%{transform:translateY(100vh) rotate(360deg);opacity:0;}}
+    .scoreCard{
+      border-radius:18px;
+      padding:14px 12px;
+      background:color-mix(in srgb,var(--glass2) 100%,transparent);
+      border:var(--board-border) solid color-mix(in srgb,var(--stroke) 58%,transparent);
+      box-shadow:0 12px 26px rgba(0,0,0,.10);
+      text-align:center;
     }
+    .scoreCard .label{font-size:20px;margin-bottom:4px;color:var(--muted);}    
+    .scoreCard .value{font-size:28px;font-weight:900;}
+    /* Barra inferior */
+    .nav{
+      position:fixed;
+      bottom:0;
+      left:0;
+      width:100%;
+      height:calc(var(--navH) + env(safe-area-inset-bottom,0px));
+      padding-bottom:env(safe-area-inset-bottom,0px);
+      background:color-mix(in srgb,var(--navBg) 100%,transparent);
+      backdrop-filter:blur(12px);
+      display:flex;
+      justify-content:space-around;
+      align-items:center;
+      border-top:1px solid color-mix(in srgb,var(--stroke) 45%,transparent);
+      box-shadow:0 -10px 20px rgba(0,0,0,.25);
+      z-index:10;
+    }
+    .nav button{
+      appearance:none;
+      background:color-mix(in srgb,var(--navBtnBg) 100%,transparent);
+      border:2px solid color-mix(in srgb,var(--stroke) 50%,transparent);
+      border-radius:16px;
+      padding:12px;
+      color:var(--text);
+      cursor:pointer;
+      box-shadow:0 6px 14px rgba(0,0,0,.18);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transition:background .18s ease,border-color .18s ease;
+    }
+    .nav button.active, .nav button:hover{
+      background:color-mix(in srgb,var(--navBtnBgActive) 100%,transparent);
+      border-color:color-mix(in srgb,var(--stroke) 80%,transparent);
+    }
+    /* Modales */
+    .modal{
+      position:fixed;
+      top:0;left:0;width:100%;height:100%;
+      display:none;
+      justify-content:center;
+      align-items:center;
+      background:rgba(0,0,0,.5);
+      z-index:11;
+    }
+    .modal.active{display:flex;}
+    .modalCard{
+      background:color-mix(in srgb,var(--panel2) 86%,white 14%);
+      border-radius:28px;
+      padding:20px;
+      max-width:90%;
+      width:480px;
+      max-height:90vh;
+      overflow:auto;
+      position:relative;
+      color:var(--text);
+      box-shadow:0 18px 40px rgba(0,0,0,.30);
+    }
+    .modalCard h2{margin-top:0;font-size:32px;}
+    .closeBtn{
+      position:absolute;
+      top:12px;right:12px;
+      background:none;
+      border:none;
+      color:var(--text);
+      font-size:28px;
+      cursor:pointer;
+    }
+    .modalCard label{display:block;margin-top:14px;font-size:16px;color:var(--muted);}    
+    .modalCard input[type="number"], .modalCard input[type="text"], .modalCard input[type="password"], .modalCard input[type="color"], .modalCard select{
+      width:100%;
+      margin-top:6px;
+      padding:8px 10px;
+      border-radius:8px;
+      border:1px solid color-mix(in srgb,var(--stroke) 60%,transparent);
+      background:color-mix(in srgb,var(--glass2) 100%,transparent);
+      color:var(--text);
+      font-size:16px;
+    }
+    .modalCard input[type="checkbox"]{margin-right:8px;}
+    .modalCard button{margin-top:20px;width:100%;padding:10px;border-radius:12px;background:color-mix(in srgb,var(--navBtnBg) 100%,transparent);border:2px solid color-mix(in srgb,var(--stroke) 50%,transparent);color:var(--text);font-size:18px;cursor:pointer;transition:background .18s ease,border-color .18s ease;}
+    .modalCard button:hover{background:color-mix(in srgb,var(--navBtnBgActive) 100%,transparent);border-color:color-mix(in srgb,var(--stroke) 80%,transparent);}
+
+    /* Animación de pulsación para botones y celdas */
+    @keyframes pop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.12); }
+      100% { transform: scale(1); }
+    }
+    .pop {
+      animation: pop var(--pop-speed, 0.3s) ease;
+    }
+    .sectionTitle{margin-top:24px;font-weight:700;font-size:18px;color:var(--text);}    
+    /* Autenticación */
+    #authGate{
+      position:fixed;
+      top:0;left:0;right:0;bottom:0;
+      background:linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 100%);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:50;
+    }
+    #authGate.hidden{display:none;}
+    #authGateCard{
+      background:color-mix(in srgb,var(--panel2) 86%,white 14%);
+      border-radius:28px;
+      padding:24px;
+      max-width:90%;
+      width:400px;
+      color:var(--text);
+      box-shadow:0 18px 40px rgba(0,0,0,.30);
+    }
+    #authGateCard h2{margin-top:0;font-size:28px;}
+    #authGateCard input{width:100%;margin-top:10px;padding:10px;border-radius:8px;border:1px solid color-mix(in srgb,var(--stroke) 60%,transparent);background:color-mix(in srgb,var(--glass2) 100%,transparent);color:var(--text);font-size:16px;}
+    #authGateCard button{width:100%;margin-top:16px;padding:12px;border-radius:12px;background:color-mix(in srgb,var(--navBtnBg) 100%,transparent);border:2px solid color-mix(in srgb,var(--stroke) 50%,transparent);color:var(--text);font-size:18px;cursor:pointer;transition:background .18s ease,border-color .18s ease;}
+    #authGateCard button:hover{background:color-mix(in srgb,var(--navBtnBgActive) 100%,transparent);border-color:color-mix(in srgb,var(--stroke) 80%,transparent);}
   </style>
 </head>
 <body>
-  <h1>Ultimate Triki — Juego Web</h1>
-  <div class="big-board" id="bigBoard">
-    <!-- Tableros pequeños se generan con JS -->
+  <!-- Autenticación -->
+  <div id="authGate">
+    <div id="authGateCard">
+      <h2 id="authTitle">Crear cuenta</h2>
+      <input id="authUser" type="text" placeholder="Usuario" />
+      <input id="authPass" type="password" placeholder="Contraseña" />
+      <button id="authBtn">Crear cuenta</button>
+      <p id="authMsg" style="margin-top:10px;color:#ffcccc;font-size:14px;display:none;"></p>
+      <!-- Permitir cambiar entre registro e inicio de sesión -->
+      <p id="switchAuth" style="margin-top:12px;font-size:14px;text-align:center;text-decoration:underline;cursor:pointer;">
+        ¿Ya tienes cuenta? Iniciar sesión / Crear cuenta
+      </p>
+    </div>
   </div>
-  <div class="controls">
-    <button id="btnNew">Nueva partida</button>
-    <button id="btnUndo" class="secondary">Deshacer</button>
-    <button id="btnHelp" class="secondary">Reglas</button>
+  <!-- Aplicación principal -->
+  <div class="app hidden" id="app">
+    <div class="top">
+      <div class="title">
+        <h1>TRIKI</h1>
+        <div class="sub">Tres en Raya</div>
+      </div>
+    </div>
+    <div class="card">
+      <!-- Turno -->
+      <div class="turnPillWrap">
+        <div class="turnPill"><span>TURNO:</span> <span class="mark" id="turnMark">X</span></div>
+      </div>
+      <!-- Tablero -->
+      <div class="boardShell">
+        <div class="board" id="board">
+          <!-- Las celdas se generan dinámicamente -->
+        </div>
+      </div>
+      <!-- Botones principales -->
+      <div class="buttons">
+        <button class="btn" id="btnReset">Reiniciar</button>
+        <button class="btn" id="btnNext">Nueva Ronda</button>
+        <button class="btn" id="btnResetAll">Reiniciar Todo</button>
+      </div>
+      <!-- Marcador -->
+      <div class="score">
+        <div class="scoreCard">
+          <div class="label">X</div>
+          <div class="value" id="scoreX">0</div>
+        </div>
+        <div class="scoreCard">
+          <div class="label">Empates</div>
+          <div class="value" id="scoreD">0</div>
+        </div>
+        <div class="scoreCard">
+          <div class="label">O</div>
+          <div class="value" id="scoreO">0</div>
+        </div>
+      </div>
+    </div>
+    <!-- Barra inferior de navegación -->
+    <div class="nav">
+      <button id="homeBtn" class="active">🏠</button>
+      <button id="settingsBtn">⚙️</button>
+      <button id="themeBtn">🎨</button>
+      <button id="soundBtn">🔊</button>
+    </div>
   </div>
-  <div id="status"></div>
-  <div id="help">
-    <h3>Reglas rápidas</h3>
-    <p>1) Empiezas jugando en cualquier tablero pequeño.</p>
-    <p>2) La casilla que elijas (0–8) manda al rival al tablero pequeño con ese mismo índice.</p>
-    <p>3) Si el tablero objetivo ya está ganado o lleno, el rival puede jugar en cualquier tablero disponible.</p>
-    <p>4) Ganas el tablero grande haciendo 3 tableros pequeños en línea.</p>
-  </div>
-  <div id="toast"></div>
+  <!-- Modal de Ajustes del Juego -->
+  <div class="modal" id="settingsModal">
+    <div class="modalCard">
+      <button class="closeBtn" id="closeSettings">✕</button>
+      <h2>Ajustes</h2>
+      <div class="sectionTitle">Modo de juego</div>
+      <label>Modo de Juego
+        <select id="modeSelect">
+          <option value="pvsp">2 Jugadores (local)</option>
+          <option value="pvai">Jugador vs IA</option>
+          <option value="aivsa">IA vs IA (autoplay)</option>
+        </select>
+      </label>
+      <label>Tiempo de espera IA (ms)
+        <input type="number" id="aiDelay" value="600" min="100" step="100" />
+      </label>
+      <div class="sectionTitle">Animaciones</div>
+      <label>Animaciones activadas
+        <input type="checkbox" id="animEnabled" checked />
+      </label>
+      <label>Velocidad del pulso (s)
+        <input type="number" id="animSpeed" value="0.3" min="0.1" max="1" step="0.1" />
+      </label>
+      <div class="sectionTitle">Tablero</div>
+      <label>Espacio entre celdas (px)
+        <input type="number" id="gapInput" value="18" min="0" max="40" />
+      </label>
+      <label>Radio de celdas (px)
+        <input type="number" id="radiusInput" value="18" min="0" max="40" />
+      </label>
+      <label>Escala ficha (X/O)
+        <input type="number" id="markScaleInput" value="1" step="0.1" min="0.5" max="2" />
+      </label>
+      <div class="sectionTitle">Símbolos</div>
+      <label>Color X
+        <input type="color" id="colorX" value="#3a3f95" />
+      </label>
+      <label>Color O
+        <input type="color" id="colorO" value="#ffffff" />
+      </label>
+      <button id="applySettings">Aplicar</button>
+      <button id="resetSettings">Restaurar valores</button>
 
+      <!-- Botón para volver a la pantalla principal -->
+      <button id="backSettings">Volver</button>
+    </div>
+  </div>
+  <!-- Modal de Temas -->
+  <div class="modal" id="themeModal">
+    <div class="modalCard">
+      <button class="closeBtn" id="closeTheme">✕</button>
+      <h2>Tema</h2>
+      <p>Colores actuales. Cambia y guarda tu propio tema:</p>
+      <label>Color fondo arriba
+        <input type="color" id="themeBg1" value="#6c2bd9" />
+      </label>
+      <label>Color fondo abajo
+        <input type="color" id="themeBg2" value="#b02bd9" />
+      </label>
+      <label>Panel principal
+        <input type="color" id="themePanel" value="#ff56e0" />
+      </label>
+      <label>Panel secundario
+        <input type="color" id="themePanel2" value="#ff7cf0" />
+      </label>
+      <button id="applyTheme">Aplicar tema</button>
+      <button id="resetTheme">Restaurar tema</button>
+      <div class="sectionTitle">Tema en JSON (importar / exportar)</div>
+      <label>Editor JSON
+        <textarea id="themeJson" rows="6" style="width:100%;margin-top:8px;padding:10px;border-radius:8px;background:color-mix(in srgb,var(--glass2) 100%,transparent);border:1px solid color-mix(in srgb,var(--stroke) 60%,transparent);color:var(--text);"></textarea>
+      </label>
+      <button id="applyThemeJson">Aplicar JSON</button>
+      <button id="copyThemeJson">Copiar JSON</button>
+      <button id="exportThemeJson">Exportar .json</button>
+      <input type="file" id="importThemeFile" accept="application/json" style="display:none;" />
+      <button id="importThemeJson">Importar .json</button>
+
+      <!-- Fondo personalizado -->
+      <div class="sectionTitle">Fondo de pantalla</div>
+      <button id="selectWallpaper">Seleccionar imagen</button>
+      <button id="clearWallpaper">Quitar fondo</button>
+      <input type="file" id="wallpaperInput" accept="image/*" style="display:none;" />
+      <!-- Se eliminó el control de opacidad: el fondo se aplica completo -->
+
+      <!-- Botón para aplicar el tema y regresar -->
+      <button id="applyThemeAndReturn">Aplicar y volver</button>
+      <!-- Botón para volver a la pantalla principal sin aplicar cambios -->
+      <button id="backTheme">Volver</button>
+    </div>
+  </div>
+  <!-- Modal de Sonido -->
+  <div class="modal" id="soundModal">
+    <div class="modalCard">
+      <button class="closeBtn" id="closeSound">✕</button>
+      <h2>Sonido</h2>
+      <label>Audio activado
+        <input type="checkbox" id="soundEnabled" checked />
+      </label>
+      <label>Volumen
+        <input type="number" id="soundVolume" min="0" max="1" step="0.05" value="0.2" />
+      </label>
+      <!-- Sección de efectos de sonido -->
+      <div class="sectionTitle">Efectos</div>
+      <label>Sonido al mover
+        <input type="checkbox" id="moveSoundEnabled" checked />
+      </label>
+
+      <button id="applySound">Aplicar</button>
+
+      <!-- Botón para volver a la pantalla principal -->
+      <button id="backSound">Volver</button>
+    </div>
+  </div>
   <script>
-  // Estado del juego
-  const STATE = {
-    currentPlayer: 'X',
-    nextSmall: null, // el tablero pequeño al que debe jugar el siguiente jugador, null = cualquier
-    smallBoards: Array.from({ length: 9 }, () => ({ cells: Array(9).fill(''), winner: '' })),
-    history: [] // para deshacer
-  };
+    // Estado del juego y configuración
+    const state = {
+      board:Array(9).fill(''),
+      turn:'X',
+      scores:{X:0,O:0,D:0},
+      settings:{
+        mode:'pvsp',
+        aiDelay:600,
+        anim:true,
+        animSpeed:0.3,
+        cellGap:18,
+        cellRadius:18,
+        markScale:1,
+        xColor:'#3a3f95',
+        oColor:'#ffffff',
+        theme:{bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0',wallpaper:''},
+        sound:{enabled:true,volume:0.2,moveSoundEnabled:true}
+      },
+      lastMove:null,
+      playing:true
+    };
 
-  const bigBoardElement = document.getElementById('bigBoard');
-  const statusElement = document.getElementById('status');
-  const toastElement = document.getElementById('toast');
+    // Claves de localStorage
+    const STORAGE_USER='trikiUser';
+    const STORAGE_PWD='trikiPwd';
+    const STORAGE_SETTINGS='trikiSettings';
 
-  function initGame() {
-    // crear tablero grande y pequeño
-    bigBoardElement.innerHTML = '';
-    STATE.smallBoards.forEach((_, idx) => {
-      const smallEl = document.createElement('div');
-      smallEl.classList.add('small-board');
-      smallEl.dataset.index = idx;
-      const boardGrid = document.createElement('div');
-      boardGrid.classList.add('board');
-      for (let i = 0; i < 9; i++) {
-        const cell = document.createElement('div');
-        cell.classList.add('cell');
-        cell.dataset.parent = idx;
-        cell.dataset.index = i;
-        cell.addEventListener('click', onCellClick);
-        boardGrid.appendChild(cell);
-      }
-      smallEl.appendChild(boardGrid);
-      bigBoardElement.appendChild(smallEl);
-    });
-    STATE.currentPlayer = 'X';
-    STATE.nextSmall = null;
-    STATE.smallBoards = Array.from({ length: 9 }, () => ({ cells: Array(9).fill(''), winner: '' }));
-    STATE.history = [];
-    updateStatus();
-    updateActiveBoards();
-  }
+    // Dom
+    const boardEl=document.getElementById('board');
+    const turnMark=document.getElementById('turnMark');
+    const scoreX=document.getElementById('scoreX');
+    const scoreO=document.getElementById('scoreO');
+    const scoreD=document.getElementById('scoreD');
+    const appEl=document.getElementById('app');
+    const authGate=document.getElementById('authGate');
+    const authTitle=document.getElementById('authTitle');
+    const authUser=document.getElementById('authUser');
+    const authPass=document.getElementById('authPass');
+    const authBtn=document.getElementById('authBtn');
+    const authMsg=document.getElementById('authMsg');
+    // Modales
+    const settingsModal=document.getElementById('settingsModal');
+    const themeModal=document.getElementById('themeModal');
+    const soundModal=document.getElementById('soundModal');
+    // Nav
+    const homeBtn=document.getElementById('homeBtn');
+    const settingsBtn=document.getElementById('settingsBtn');
+    const themeBtn=document.getElementById('themeBtn');
+    const soundBtn=document.getElementById('soundBtn');
+    // Ajustes UI
+    const modeSelect=document.getElementById('modeSelect');
+    const aiDelay=document.getElementById('aiDelay');
+    const animEnabled=document.getElementById('animEnabled');
+    // velocidad de animación (pulso)
+    const animSpeedInput=document.getElementById('animSpeed');
+    const gapInput=document.getElementById('gapInput');
+    const radiusInput=document.getElementById('radiusInput');
+    const markScaleInput=document.getElementById('markScaleInput');
+    const colorX=document.getElementById('colorX');
+    const colorO=document.getElementById('colorO');
+    const applySettingsBtn=document.getElementById('applySettings');
+    const resetSettingsBtn=document.getElementById('resetSettings');
+    // Tema UI
+    const themeBg1=document.getElementById('themeBg1');
+    const themeBg2=document.getElementById('themeBg2');
+    const themePanel=document.getElementById('themePanel');
+    const themePanel2=document.getElementById('themePanel2');
+    const applyThemeBtn=document.getElementById('applyTheme');
+    const resetThemeBtn=document.getElementById('resetTheme');
+    // Botón que aplica el tema y regresa a la pantalla principal
+    const applyThemeAndReturnBtn=document.getElementById('applyThemeAndReturn');
+    const themeJson=document.getElementById('themeJson');
+    const applyThemeJsonBtn=document.getElementById('applyThemeJson');
+    const copyThemeJsonBtn=document.getElementById('copyThemeJson');
+    const exportThemeJsonBtn=document.getElementById('exportThemeJson');
+    const importThemeJsonBtn=document.getElementById('importThemeJson');
+    const importThemeFile=document.getElementById('importThemeFile');
+    // Fondo UI
+    const selectWallpaper=document.getElementById('selectWallpaper');
+    const clearWallpaper=document.getElementById('clearWallpaper');
+    const wallpaperInput=document.getElementById('wallpaperInput');
+    // Se eliminaron los controles y listeners de opacidad de fondo; la imagen se aplica completa
+    // Botones de volver en modales
+    const backSettings=document.getElementById('backSettings');
+    const backTheme=document.getElementById('backTheme');
+    const backSound=document.getElementById('backSound');
 
-  function onCellClick(evt) {
-    const cell = evt.currentTarget;
-    const smallIdx = parseInt(cell.dataset.parent);
-    const cellIdx = parseInt(cell.dataset.index);
-    const board = STATE.smallBoards[smallIdx];
-    // Validar jugada
-    if (board.winner || board.cells[cellIdx]) {
-      return; // casilla ya usada o tablero ganado
-    }
-    if (STATE.nextSmall !== null && smallIdx !== STATE.nextSmall) {
-      showToast('Debes jugar en el tablero indicado.');
-      return;
-    }
-    // Registrar en historial para deshacer
-    const snapshot = JSON.parse(JSON.stringify(STATE));
-    STATE.history.push(snapshot);
-    // Marcar la jugada
-    board.cells[cellIdx] = STATE.currentPlayer;
-    cell.textContent = STATE.currentPlayer;
-    // Revisar ganador del tablero pequeño
-    if (checkWinner(board.cells)) {
-      board.winner = STATE.currentPlayer;
-      const smallEl = cell.closest('.small-board');
-      smallEl.classList.add('won');
-      smallEl.dataset.winner = STATE.currentPlayer;
-    } else if (board.cells.every(v => v)) {
-      board.winner = 'T'; // empate
-    }
-    // Revisar ganador del tablero grande
-    const bigWinner = checkBigWinner();
-    if (bigWinner) {
-      endGame(bigWinner);
-      return;
-    }
-    // Cambiar jugador y actualizar próximo tablero
-    STATE.currentPlayer = STATE.currentPlayer === 'X' ? 'O' : 'X';
-    STATE.nextSmall = board.cells[cellIdx] && STATE.smallBoards[cellIdx].winner ? null : cellIdx;
-    // Si el siguiente tablero está ganado o lleno, permitir cualquiera
-    if (STATE.nextSmall !== null) {
-      const nextBoard = STATE.smallBoards[STATE.nextSmall];
-      if (nextBoard.winner || nextBoard.cells.every(v => v)) {
-        STATE.nextSmall = null;
-      }
-    }
-    updateActiveBoards();
-    updateStatus();
-  }
+    // Botón para alternar entre crear cuenta e iniciar sesión (borrar cuenta)
+    const switchAuthBtn=document.getElementById('switchAuth');
+    // Sonido UI
+    const soundEnabled=document.getElementById('soundEnabled');
+    const soundVolume=document.getElementById('soundVolume');
+    // Checkbox de sonido al mover
+    const moveSoundEnabled=document.getElementById('moveSoundEnabled');
+    const applySoundBtn=document.getElementById('applySound');
 
-  function updateActiveBoards() {
-    const smallEls = document.querySelectorAll('.small-board');
-    smallEls.forEach(el => {
-      const idx = parseInt(el.dataset.index);
-      const board = STATE.smallBoards[idx];
-      const cells = el.querySelectorAll('.cell');
-      if (board.winner) {
-        cells.forEach(c => c.classList.add('disabled'));
+    // Si el usuario desea cambiar de cuenta o crear una nueva, este botón borra las credenciales almacenadas
+    // y vuelve a mostrar la pantalla de autenticación. Esto facilita crear una nueva cuenta si ya existe una previa.
+    if(switchAuthBtn){
+      switchAuthBtn.addEventListener('click',()=>{
+        localStorage.removeItem(STORAGE_USER);
+        localStorage.removeItem(STORAGE_PWD);
+        checkAuth();
+      });
+    }
+
+    // Helpers para colores: convertir HEX a RGBA con opacidad y construir un gradiente con opacidad
+    function hexToRgba(hex, alpha){
+      let h=hex.replace('#','');
+      if(h.length===3) h=h.split('').map(c=>c+c).join('');
+      const bigint=parseInt(h,16);
+      const r=(bigint>>16)&255;
+      const g=(bigint>>8)&255;
+      const b=bigint&255;
+      return `rgba(${r},${g},${b},${alpha})`;
+    }
+    function linearGradientWithOpacity(color1,color2,alpha){
+      return `linear-gradient(180deg, ${hexToRgba(color1,alpha)} 0%, ${hexToRgba(color2,alpha)} 100%)`;
+    }
+    // Registro/inicio de sesión
+    // Genera un hash simple base64 (nuevo formato)
+    function hash(str){
+      return btoa(str);
+    }
+    // Calcula un hash SHA-256 en hexadecimal. Usado para compatibilidad con versiones antiguas.
+    async function sha256Hex(str){
+      const encoder=new TextEncoder();
+      const data=encoder.encode(str);
+      const digest=await crypto.subtle.digest('SHA-256',data);
+      return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");
+    }
+    function checkAuth(){
+      const user=localStorage.getItem(STORAGE_USER);
+      const pwd=localStorage.getItem(STORAGE_PWD);
+      // Reiniciar campos y mensaje
+      authUser.value='';
+      authPass.value='';
+      authMsg.style.display='none';
+      // Si existe una cuenta guardada, iniciar sesión automáticamente y saltar la puerta
+      if(user && pwd){
+        authGate.classList.add('hidden');
+        appEl.classList.remove('hidden');
+        // Preparar la aplicación
+        initGame();
         return;
       }
-      if (STATE.nextSmall === null || STATE.nextSmall === idx) {
-        // activar celdas vacías
-        cells.forEach(c => {
-          const cellIndex = parseInt(c.dataset.index);
-          if (!board.cells[cellIndex]) {
-            c.classList.remove('disabled');
-          } else {
-            c.classList.add('disabled');
-          }
-        });
-      } else {
-        // desactivar todas
-        cells.forEach(c => c.classList.add('disabled'));
+      // De lo contrario, mostrar registro/inicio de sesión según exista usuario
+      if(!user||!pwd){
+        authTitle.textContent='Crear cuenta';
+        authBtn.textContent='Crear cuenta';
+      }else{
+        authTitle.textContent='Iniciar sesión';
+        authBtn.textContent='Iniciar sesión';
       }
-    });
-  }
-
-  function checkWinner(cells) {
-    const lines = [
-      [0, 1, 2], [3, 4, 5], [6, 7, 8],
-      [0, 3, 6], [1, 4, 7], [2, 5, 8],
-      [0, 4, 8], [2, 4, 6]
-    ];
-    return lines.some(([a, b, c]) => {
-      return cells[a] && cells[a] === cells[b] && cells[a] === cells[c];
-    });
-  }
-
-  function checkBigWinner() {
-    const boards = STATE.smallBoards.map(b => b.winner === 'T' ? '' : b.winner);
-    if (!boards.some(Boolean)) return null;
-    return checkWinner(boards) ? STATE.currentPlayer : null;
-  }
-
-  function endGame(winner) {
-    updateStatus();
-    showToast('Jugador ' + winner + ' ha ganado el tablero grande.');
-    // desactivar todas las celdas
-    document.querySelectorAll('.cell').forEach(c => c.classList.add('disabled'));
-  }
-
-  function updateStatus() {
-    let status = 'Turno de ' + STATE.currentPlayer;
-    if (STATE.nextSmall !== null) {
-      status += ' — juega en tablero ' + STATE.nextSmall;
-    } else {
-      status += ' — juega en cualquier tablero';
+      authGate.classList.remove('hidden');
     }
-    statusElement.textContent = status;
-  }
-
-  function showToast(message) {
-    toastElement.textContent = message;
-    toastElement.style.display = 'block';
-    setTimeout(() => { toastElement.style.display = 'none'; }, 2000);
-  }
-
-  // Botones
-  document.getElementById('btnNew').addEventListener('click', () => {
-    initGame();
-  });
-  document.getElementById('btnUndo').addEventListener('click', () => {
-    if (STATE.history.length === 0) return;
-    const last = STATE.history.pop();
-    // Restaurar el estado previo
-    Object.assign(STATE, JSON.parse(JSON.stringify(last)));
-    // Re-render tablero
-    // actualizamos cada celda y clases
-    STATE.smallBoards.forEach((board, idx) => {
-      const smallEl = bigBoardElement.querySelector(`.small-board[data-index="${idx}"]`);
-      const cellsEls = smallEl.querySelectorAll('.cell');
-      cellsEls.forEach((celEl) => {
-        const cIdx = parseInt(celEl.dataset.index);
-        celEl.textContent = board.cells[cIdx];
-      });
-      if (board.winner && board.winner !== 'T') {
-        smallEl.classList.add('won');
-        smallEl.dataset.winner = board.winner;
-      } else {
-        smallEl.classList.remove('won');
-        smallEl.removeAttribute('data-winner');
+    authBtn.addEventListener('click',async ()=>{
+      const u=authUser.value.trim();
+      const p=authPass.value.trim();
+      if(!u||!p){
+        authMsg.textContent='Completa usuario y contraseña';
+        authMsg.style.display='block';
+        return;
+      }
+      const storedUser=localStorage.getItem(STORAGE_USER);
+      const storedPwd=localStorage.getItem(STORAGE_PWD);
+      if(!storedUser){
+        // Crear cuenta nueva
+        localStorage.setItem(STORAGE_USER,u);
+        // Guardar contraseña en nuevo formato base64
+        localStorage.setItem(STORAGE_PWD,hash(p));
+        authGate.classList.add('hidden');
+        appEl.classList.remove('hidden');
+        initGame();
+      }else{
+        // Iniciar sesión: comprobar contraseña en formato base64 o antiguo SHA-256
+        const hashed=hash(p);
+        let ok=false;
+        if(u===storedUser && hashed===storedPwd){
+          ok=true;
+        }else{
+          // Intentar con hash antiguo
+          const oldHash=await sha256Hex(p);
+          if(u===storedUser && oldHash===storedPwd){
+            // Migrar: guardar en nuevo formato para próximas veces
+            localStorage.setItem(STORAGE_PWD,hashed);
+            ok=true;
+          }
+        }
+        if(ok){
+          authGate.classList.add('hidden');
+          appEl.classList.remove('hidden');
+          initGame();
+        }else{
+          authMsg.textContent='Credenciales incorrectas';
+          authMsg.style.display='block';
+        }
       }
     });
-    updateActiveBoards();
-    updateStatus();
-  });
-  document.getElementById('btnHelp').addEventListener('click', () => {
-    const help = document.getElementById('help');
-    help.style.display = help.style.display === 'none' ? 'block' : 'none';
-  });
 
-  // Inicializar
-  initGame();
+    // Juego
+    function initGame(){
+      // Cargar configuración guardada
+      const saved=localStorage.getItem(STORAGE_SETTINGS);
+      if(saved){
+        try{
+          const obj=JSON.parse(saved);
+          Object.assign(state.settings,obj);
+        }catch(e){}
+      }
+      applySettingsToUI();
+      applyThemeToUI();
+      applySoundToUI();
+      applyCssVars();
+      // Construir tablero
+      boardEl.innerHTML='';
+      state.board=Array(9).fill('');
+      for(let i=0;i<9;i++){
+        const cell=document.createElement('div');
+        cell.className='cell';
+        cell.dataset.index=i;
+        cell.addEventListener('click',()=>handleCell(i));
+        boardEl.appendChild(cell);
+      }
+      updateUI();
+      maybeAiTurn();
+    }
+
+    function handleCell(i){
+      if(!state.playing) return;
+      if(state.board[i]) return;
+      // Reproducir sonido de movimiento si corresponde
+      playMoveSound();
+      // marcar celda y aplicar animación pop
+      state.board[i]=state.turn;
+      addPopToCell(i);
+      state.lastMove=i;
+      updateUI();
+      if(checkWinner(state.turn)){
+        state.playing=false;
+        if(state.turn==='X') state.scores.X++; else state.scores.O++;
+        updateScore();
+        setTimeout(()=>nextRound(),800);
+        playSfx('win');
+        // Mostrar animación de victoria con confeti
+        showWinAnimation(state.turn);
+        return;
+      }
+      if(state.board.every(v=>v)){
+        state.playing=false;
+        state.scores.D++;
+        updateScore();
+        setTimeout(()=>nextRound(),800);
+        playSfx('draw');
+        // Mostrar animación de empate
+        showWinAnimation('draw');
+        return;
+      }
+      // Cambiar turno
+      state.turn=state.turn==='X'?'O':'X';
+      updateTurnUI();
+      maybeAiTurn();
+    }
+
+    function checkWinner(player){
+      const b=state.board;
+      const wins=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+      return wins.some(([a,b2,c])=>b[a]===player && b[b2]===player && b[c]===player);
+    }
+    function nextRound(){
+      state.board=Array(9).fill('');
+      state.playing=true;
+      state.turn='X';
+      state.lastMove=null;
+      updateUI();
+      maybeAiTurn();
+    }
+    function resetGame(){
+      state.scores={X:0,O:0,D:0};
+      nextRound();
+    }
+    // IA simple: mueve aleatoriamente
+    function aiMove(){
+      const empty=state.board.map((v,i)=>v?null:i).filter(v=>v!==null);
+      if(!empty.length) return;
+      const idx=empty[Math.floor(Math.random()*empty.length)];
+      handleCell(idx);
+    }
+    function maybeAiTurn(){
+      if(!state.playing) return;
+      if(state.settings.mode==='pvsp') return;
+      const isAiTurn=(state.settings.mode==='pvai' && state.turn==='O') || (state.settings.mode==='aivsa');
+      if(isAiTurn){
+        setTimeout(()=>{
+          aiMove();
+          if(state.settings.mode==='aivsa' && state.playing){
+            // en autoplay, deja que la IA siga moviendo automáticamente
+            maybeAiTurn();
+          }
+        },state.settings.aiDelay);
+      }
+    }
+    // Actualizar la interfaz
+    function updateUI(){
+      const cells=boardEl.children;
+      for(let i=0;i<9;i++){
+        const cell=cells[i];
+        cell.textContent=state.board[i];
+        cell.classList.remove('markX','markO','win');
+        if(state.board[i]==='X') cell.classList.add('markX');
+        if(state.board[i]==='O') cell.classList.add('markO');
+      }
+      updateTurnUI();
+    }
+    function updateTurnUI(){
+      turnMark.textContent=state.turn;
+    }
+    function updateScore(){
+      scoreX.textContent=state.scores.X;
+      scoreO.textContent=state.scores.O;
+      scoreD.textContent=state.scores.D;
+    }
+    // Aplicar configuración CSS
+    function applyCssVars(){
+      const r=document.documentElement.style;
+      r.setProperty('--cell-gap',state.settings.cellGap+'px');
+      r.setProperty('--cell-radius',state.settings.cellRadius+'px');
+      r.setProperty('--cell-size',state.settings.cellSize?state.settings.cellSize+'px':state.settings.cellRadius*4+'px');
+      r.setProperty('--mark-scale',state.settings.markScale);
+      r.setProperty('--x',state.settings.xColor);
+      r.setProperty('--o',state.settings.oColor);
+      r.setProperty('--bg1',state.settings.theme.bg1);
+      r.setProperty('--bg2',state.settings.theme.bg2);
+      r.setProperty('--panel',state.settings.theme.panel);
+      r.setProperty('--panel2',state.settings.theme.panel2);
+      // Fondo personalizado: establecer variable y aplicar imagen de fondo al body
+      // La variable CSS --wallpaper ya no se usa; la imagen se aplica directamente al body
+      // Si hay fondo personalizado, aplicarlo tal cual; en caso contrario usar el degradado base.
+      if(state.settings.theme.wallpaper){
+        document.body.style.background = `url(${state.settings.theme.wallpaper})`;
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundPosition = 'center';
+        document.body.style.backgroundRepeat = 'no-repeat';
+      }else{
+        const grad = linearGradientWithOpacity(state.settings.theme.bg1,state.settings.theme.bg2,1);
+        document.body.style.background = grad;
+        document.body.style.backgroundSize = '';
+        document.body.style.backgroundPosition = '';
+        document.body.style.backgroundRepeat = '';
+      }
+      r.setProperty('--anim-enabled',state.settings.anim?1:0);
+      // Ajustar la velocidad del pulso
+      r.setProperty('--pop-speed', (state.settings.animSpeed||0.3) + 's');
+      document.body.classList.toggle('anim-off',!state.settings.anim);
+    }
+    // Ajustes -> cargar valores en formulario
+    function applySettingsToUI(){
+      modeSelect.value=state.settings.mode;
+      aiDelay.value=state.settings.aiDelay;
+      animEnabled.checked=state.settings.anim;
+      animSpeedInput.value=state.settings.animSpeed;
+      gapInput.value=state.settings.cellGap;
+      radiusInput.value=state.settings.cellRadius;
+      markScaleInput.value=state.settings.markScale;
+      colorX.value=state.settings.xColor;
+      colorO.value=state.settings.oColor;
+    }
+    // Tema -> cargar valores
+    function applyThemeToUI(){
+      themeBg1.value=state.settings.theme.bg1;
+      themeBg2.value=state.settings.theme.bg2;
+      themePanel.value=state.settings.theme.panel;
+      themePanel2.value=state.settings.theme.panel2;
+      // actualizar json
+      updateThemeJson();
+      // No se actualiza control de opacidad de fondo porque se eliminó
+    }
+    function applySoundToUI(){
+      soundEnabled.checked=state.settings.sound.enabled;
+      soundVolume.value=state.settings.sound.volume;
+      if(moveSoundEnabled) moveSoundEnabled.checked = state.settings.sound.moveSoundEnabled;
+    }
+    // Guardar configuración
+    function saveSettings(){
+      localStorage.setItem(STORAGE_SETTINGS,JSON.stringify(state.settings));
+    }
+    // Sonido simple con Web Audio API
+    let audioCtx;
+    /*
+      Sonido de movimiento (clic). Para evitar problemas de ruta y permitir que el juego
+      funcione correctamente en GitHub Pages y otros entornos estáticos, incrustamos el
+      archivo MP3 como un Data URI. Esto elimina las peticiones HTTP adicionales y
+      garantiza que el sonido esté disponible antes de reproducirse. Si necesitas
+      sustituir el sonido por otro, reemplaza el valor de "moveSoundDataUri" por un
+      Data URI generado a partir del nuevo archivo MP3 (p. ej. usando base64).
+
+      Nota: El Data URI ha sido generado previamente a partir del archivo
+      "mouse-click-sfx-444806.mp3" y puede ser bastante largo. Está colocado como una
+      constante para que el navegador lo cargue de inmediato. Se especifica el tipo
+      "audio/mp3" explícitamente para que todos los navegadores lo interpreten de forma
+      correcta.
+    */
+    /*
+      Sonido de movimiento (clic). Para garantizar que el sonido siempre esté disponible y evitar
+      bloqueos al cargar un archivo externo (sobre todo al desplegarse en GitHub Pages),
+      incrustamos el archivo MP3 como un Data URI. El valor proviene del archivo
+      "moveSoundDataURI.txt" generado previamente. Si deseas sustituir el sonido,
+      reemplaza la siguiente cadena por el Data URI correspondiente del nuevo archivo.
+    */
+    // Ruta del sonido de clic. Se utiliza un archivo mp3 incluido en el mismo repositorio (misma ruta que index.html).
+    // Se usa un objeto Audio base y se clonará en cada reproducción para evitar interferencias entre instancias.
+    const moveAudioBase = new Audio('mouse-click-sfx-444806.mp3');
+    moveAudioBase.preload = 'auto';
+    try{ moveAudioBase.load(); }catch(e){}
+    function playTone(freq,dur){
+      if(!state.settings.sound.enabled) return;
+      if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+      const osc=audioCtx.createOscillator();
+      const gain=audioCtx.createGain();
+      osc.type='square';
+      osc.frequency.value=freq;
+      gain.gain.value=state.settings.sound.volume;
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime+dur);
+    }
+    // Reproduce un sonido corto (tipo beep) para eventos como victoria o empate. Si
+    // se desea personalizar estos sonidos, puede modificarse la frecuencia y duración.
+    function playSfx(type){
+      if(type==='win') playTone(440,0.3);
+      else if(type==='draw') playTone(180,0.2);
+      else playTone(300,0.1);
+    }
+
+    // Reproduce el sonido de movimiento (clic) si el sonido está habilitado. Encapsulamos
+    // la lógica en una función para poder manejar errores y centralizar la configuración.
+    function playMoveSound(){
+      // Reproduce el sonido de movimiento. Si el audio está deshabilitado, no hace nada.
+      if(!state.settings.sound.enabled || !state.settings.sound.moveSoundEnabled) return;
+      try{
+        // Clonar el elemento base para evitar conflictos con reproducciones en curso.
+        const audio = moveAudioBase.cloneNode();
+        audio.volume = state.settings.sound.volume;
+        audio.currentTime = 0;
+        audio.play().catch(()=>{});
+      }catch(e){
+        // Silenciar cualquier error para que el flujo del juego continúe
+      }
+    }
+
+    // === Animación de pulsación ===
+    // Agrega la clase .pop al elemento y la remueve al finalizar la animación.
+    function addPop(el){
+      if(!state.settings.anim) return;
+      el.classList.add('pop');
+      // Definir el manejador fuera para poder eliminarlo posteriormente
+      const handler = () => {
+        el.classList.remove('pop');
+        el.removeEventListener('animationend', handler);
+      };
+      el.addEventListener('animationend', handler);
+    }
+    // Añade efecto pop a una celda del tablero usando su índice
+    function addPopToCell(idx){
+      const el = boardEl.children[idx];
+      if(el) addPop(el);
+    }
+    // Adjunta el efecto pop a botones de navegación y botones principales
+    function attachPopToElements(){
+      const navButtons=[homeBtn,settingsBtn,themeBtn,soundBtn];
+      navButtons.forEach(btn=>{
+        btn.addEventListener('click',()=>{addPop(btn);});
+      });
+      // Botones principales (reiniciar, nueva ronda, reiniciar todo)
+      document.querySelectorAll('.btn').forEach(btn=>{
+        btn.addEventListener('click',()=>{addPop(btn);});
+      });
+      // Botones dentro de modales (aplicar, resetear, volver, importar, etc.)
+      document.querySelectorAll('.modalCard button').forEach(btn=>{
+        btn.addEventListener('click',()=>{addPop(btn);});
+      });
+    }
+
+    // Colores para los confetis de la animación de victoria
+    const confColors=['#ff5e8c','#ffc94d','#5effa1','#6ecbff','#e4ff56'];
+    // Muestra una animación de victoria o empate. Crea un overlay con mensaje y confeti y lo elimina tras unos segundos.
+    function showWinAnimation(winner){
+      const overlay=document.createElement('div');
+      overlay.className='winOverlay';
+      const msg=document.createElement('div');
+      msg.className='message';
+      if(winner==='draw'){
+        msg.textContent='¡Empate!';
+      }else{
+        msg.textContent = winner==='X' ? '¡X gana!' : '¡O gana!';
+      }
+      overlay.appendChild(msg);
+      // Crear partículas de confeti
+      for(let i=0;i<30;i++){
+        const conf=document.createElement('div');
+        conf.className='confetti';
+        conf.style.left=(Math.random()*100)+'vw';
+        conf.style.backgroundColor=confColors[Math.floor(Math.random()*confColors.length)];
+        conf.style.animationDuration=(2+Math.random())+'s';
+        overlay.appendChild(conf);
+      }
+      document.body.appendChild(overlay);
+      // Eliminar después de 3 segundos
+      setTimeout(()=>{overlay.remove();},3000);
+    }
+    // Eventos botones de navegación
+    function closeAllModals(){
+      settingsModal.classList.remove('active');
+      themeModal.classList.remove('active');
+      soundModal.classList.remove('active');
+    }
+    homeBtn.addEventListener('click',()=>{closeAllModals();homeBtn.classList.add('active');settingsBtn.classList.remove('active');themeBtn.classList.remove('active');soundBtn.classList.remove('active');});
+    settingsBtn.addEventListener('click',()=>{closeAllModals();settingsModal.classList.add('active');settingsBtn.classList.add('active');homeBtn.classList.remove('active');themeBtn.classList.remove('active');soundBtn.classList.remove('active');});
+    themeBtn.addEventListener('click',()=>{closeAllModals();themeModal.classList.add('active');themeBtn.classList.add('active');homeBtn.classList.remove('active');settingsBtn.classList.remove('active');soundBtn.classList.remove('active');});
+    soundBtn.addEventListener('click',()=>{closeAllModals();soundModal.classList.add('active');soundBtn.classList.add('active');homeBtn.classList.remove('active');settingsBtn.classList.remove('active');themeBtn.classList.remove('active');});
+    // Cerrar con botón ✕
+    document.getElementById('closeSettings').onclick=()=>{settingsModal.classList.remove('active');settingsBtn.classList.remove('active');homeBtn.classList.add('active');};
+    document.getElementById('closeTheme').onclick=()=>{themeModal.classList.remove('active');themeBtn.classList.remove('active');homeBtn.classList.add('active');};
+    document.getElementById('closeSound').onclick=()=>{soundModal.classList.remove('active');soundBtn.classList.remove('active');homeBtn.classList.add('active');};
+    // Botones principales
+    document.getElementById('btnReset').onclick=()=>{nextRound();};
+    document.getElementById('btnNext').onclick=()=>{nextRound();};
+    document.getElementById('btnResetAll').onclick=()=>{resetGame();};
+    // Aplicar y restaurar ajustes
+    applySettingsBtn.addEventListener('click',()=>{
+      state.settings.mode=modeSelect.value;
+      state.settings.aiDelay=parseInt(aiDelay.value)||600;
+      state.settings.anim=animEnabled.checked;
+      state.settings.animSpeed=parseFloat(animSpeedInput.value)||0.3;
+      state.settings.cellGap=parseInt(gapInput.value)||18;
+      state.settings.cellRadius=parseInt(radiusInput.value)||18;
+      state.settings.markScale=parseFloat(markScaleInput.value)||1;
+      state.settings.xColor=colorX.value;
+      state.settings.oColor=colorO.value;
+      applyCssVars();
+      saveSettings();
+      nextRound();
+
+      // Cerrar modal y volver a la pantalla principal
+      settingsModal.classList.remove('active');
+      settingsBtn.classList.remove('active');
+      homeBtn.classList.add('active');
+    });
+    resetSettingsBtn.addEventListener('click',()=>{
+      state.settings={
+        ...state.settings,
+        mode:'pvsp',
+        aiDelay:600,
+        anim:true,
+        animSpeed:0.3,
+        cellGap:18,
+        cellRadius:18,
+        markScale:1,
+        xColor:'#3a3f95',
+        oColor:'#ffffff'
+      };
+      applySettingsToUI();
+      applyCssVars();
+      saveSettings();
+      nextRound();
+      // Cerrar modal y volver a la pantalla principal
+      settingsModal.classList.remove('active');
+      settingsBtn.classList.remove('active');
+      homeBtn.classList.add('active');
+    });
+    // Tema: aplicar y resetear
+    applyThemeBtn.addEventListener('click',()=>{
+      state.settings.theme.bg1=themeBg1.value;
+      state.settings.theme.bg2=themeBg2.value;
+      state.settings.theme.panel=themePanel.value;
+      state.settings.theme.panel2=themePanel2.value;
+      applyCssVars();
+      applyThemeToUI();
+      saveSettings();
+
+      // Cerrar modal y volver a la pantalla principal
+      themeModal.classList.remove('active');
+      themeBtn.classList.remove('active');
+      homeBtn.classList.add('active');
+    });
+
+    // Aplicar tema y volver en un solo paso
+    if(applyThemeAndReturnBtn){
+      applyThemeAndReturnBtn.addEventListener('click',()=>{
+        // Copiar lógica de aplicar tema
+        state.settings.theme.bg1=themeBg1.value;
+        state.settings.theme.bg2=themeBg2.value;
+        state.settings.theme.panel=themePanel.value;
+        state.settings.theme.panel2=themePanel2.value;
+        applyCssVars();
+        applyThemeToUI();
+        saveSettings();
+        // Cerrar modal y volver a pantalla principal
+        themeModal.classList.remove('active');
+        themeBtn.classList.remove('active');
+        homeBtn.classList.add('active');
+      });
+    }
+    resetThemeBtn.addEventListener('click',()=>{
+      state.settings.theme={
+        bg1:'#6c2bd9',
+        bg2:'#b02bd9',
+        panel:'#ff56e0',
+        panel2:'#ff7cf0',
+        wallpaper:''
+      };
+      applyCssVars();
+      applyThemeToUI();
+      saveSettings();
+      // Cerrar modal y volver a la pantalla principal
+      themeModal.classList.remove('active');
+      themeBtn.classList.remove('active');
+      homeBtn.classList.add('active');
+    });
+    // Tema JSON helper
+    function updateThemeJson(){
+      const json={name:'Mi tema',version:1,vars:{
+        '--bg1':state.settings.theme.bg1,
+        '--bg2':state.settings.theme.bg2,
+        '--panel':state.settings.theme.panel,
+        '--panel2':state.settings.theme.panel2,
+        '--x':state.settings.xColor,
+        '--o':state.settings.oColor,
+        '--wallpaper':state.settings.theme.wallpaper||''
+      }};
+      themeJson.value=JSON.stringify(json,null,2);
+    }
+    applyThemeJsonBtn.addEventListener('click',()=>{
+      try{
+        const obj=JSON.parse(themeJson.value);
+        const vars=obj.vars||obj;
+        if(vars['--bg1']) state.settings.theme.bg1=vars['--bg1'];
+        if(vars['--bg2']) state.settings.theme.bg2=vars['--bg2'];
+        if(vars['--panel']) state.settings.theme.panel=vars['--panel'];
+        if(vars['--panel2']) state.settings.theme.panel2=vars['--panel2'];
+        if(vars['--x']) state.settings.xColor=vars['--x'];
+        if(vars['--o']) state.settings.oColor=vars['--o'];
+        if(vars['--wallpaper']!==undefined){
+          // Asignar wallpaper; si es cadena vacía se elimina
+          state.settings.theme.wallpaper = vars['--wallpaper'] || '';
+        }
+        // Se ignora la opacidad de fondo en la importación de temas
+        applyCssVars();
+        applySettingsToUI();
+        applyThemeToUI();
+        saveSettings();
+
+        // Cerrar modal y volver a la pantalla principal
+        themeModal.classList.remove('active');
+        themeBtn.classList.remove('active');
+        homeBtn.classList.add('active');
+      }catch(e){alert('JSON inválido');}
+    });
+    copyThemeJsonBtn.addEventListener('click',()=>{
+      navigator.clipboard.writeText(themeJson.value).then(()=>{alert('Tema copiado en el portapapeles');});
+    });
+    exportThemeJsonBtn.addEventListener('click',()=>{
+      const blob=new Blob([themeJson.value],{type:'application/json'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;
+      a.download='triki-theme.json';
+      a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+    });
+    importThemeJsonBtn.addEventListener('click',()=>{importThemeFile.click();});
+    importThemeFile.addEventListener('change',e=>{
+      const file=e.target.files[0];
+      if(!file) return;
+      const reader=new FileReader();
+      reader.onload=function(ev){themeJson.value=ev.target.result;applyThemeJsonBtn.click();};
+      reader.readAsText(file);
+    });
+
+    // Fondo personalizado
+    selectWallpaper.addEventListener('click',()=>{
+      wallpaperInput.click();
+    });
+    wallpaperInput.addEventListener('change',e=>{
+      const file=e.target.files[0];
+      if(!file) return;
+      const reader=new FileReader();
+      reader.onload=function(ev){
+        state.settings.theme.wallpaper=ev.target.result;
+        applyCssVars();
+        // Actualizar los controles de tema para reflejar la imagen cargada
+        applyThemeToUI();
+        updateThemeJson();
+        saveSettings();
+      };
+      reader.readAsDataURL(file);
+    });
+    clearWallpaper.addEventListener('click',()=>{
+      state.settings.theme.wallpaper='';
+      applyCssVars();
+      updateThemeJson();
+      saveSettings();
+    });
+
+    // Navegación: botones de volver en modales
+    backSettings.addEventListener('click',()=>{
+      settingsModal.classList.remove('active');
+      settingsBtn.classList.remove('active');
+      homeBtn.classList.add('active');
+    });
+    backTheme.addEventListener('click',()=>{
+      themeModal.classList.remove('active');
+      themeBtn.classList.remove('active');
+      homeBtn.classList.add('active');
+    });
+    backSound.addEventListener('click',()=>{
+      soundModal.classList.remove('active');
+      soundBtn.classList.remove('active');
+      homeBtn.classList.add('active');
+    });
+    // Sonido
+    applySoundBtn.addEventListener('click',()=>{
+      state.settings.sound.enabled=soundEnabled.checked;
+      state.settings.sound.volume=parseFloat(soundVolume.value)||0.2;
+      state.settings.sound.moveSoundEnabled = moveSoundEnabled.checked;
+      saveSettings();
+
+      // Cerrar modal y volver a la pantalla principal
+      soundModal.classList.remove('active');
+      soundBtn.classList.remove('active');
+      homeBtn.classList.add('active');
+    });
+    // Guardar tema/json al cambiar colores
+    themeBg1.addEventListener('change',updateThemeJson);
+    themeBg2.addEventListener('change',updateThemeJson);
+    themePanel.addEventListener('change',updateThemeJson);
+    themePanel2.addEventListener('change',updateThemeJson);
+    colorX.addEventListener('change',()=>{state.settings.xColor=colorX.value;applyCssVars();updateThemeJson();saveSettings();});
+    colorO.addEventListener('change',()=>{state.settings.oColor=colorO.value;applyCssVars();updateThemeJson();saveSettings();});
+    // Iniciar autenticación cuando cargue la página
+    document.addEventListener('DOMContentLoaded',()=>{
+      checkAuth();
+      // Adjuntar animación de pulsación a elementos interactivos una vez cargado el DOM
+      attachPopToElements();
+    });
   </script>
 </body>
 </html>
