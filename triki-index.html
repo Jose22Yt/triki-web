@@ -706,6 +706,22 @@
         <input type="range" id="themeParallax" min="0" max="40" step="1" value="0" />
       </label>
 
+      <!-- Ajustes globales de color
+           Estos controles permiten retocar el matiz, saturación y brillo de todo
+           el tema mediante filtros CSS. Un valor más alto de matiz rota el
+           espectro de colores, mientras que saturación y brillo amplifican o
+           reducen los colores base. -->
+      <div class="sectionTitle">Ajustes de color</div>
+      <label>Tono (Hue)
+        <input type="range" id="themeHue" min="0" max="360" step="1" value="0" />
+      </label>
+      <label>Saturación (%)
+        <input type="range" id="themeSat" min="50" max="200" step="1" value="100" />
+      </label>
+      <label>Brillo (%)
+        <input type="range" id="themeBright" min="50" max="200" step="1" value="100" />
+      </label>
+
       <!-- Botón para aplicar el tema y regresar -->
       <button id="applyThemeAndReturn">Aplicar y volver</button>
       <!-- Botón para volver a la pantalla principal sin aplicar cambios -->
@@ -751,8 +767,10 @@
         markScale:1,
         xColor:'#3a3f95',
         oColor:'#ffffff',
-        // Añadimos "parallax" para controlar el efecto 3D del fondo
-        theme:{bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0',wallpaper:'',parallax:0},
+        // Añadimos "parallax" para controlar el efecto 3D del fondo.
+        // También incorporamos hue, sat y bright para ajustar tono, saturación y brillo
+        // globales mediante filtros CSS (valores iniciales: 0° de rotación, 1 de saturación y brillo).
+        theme:{bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0',wallpaper:'',parallax:0,hue:0,sat:1,bright:1},
         sound:{enabled:true,volume:0.2,moveSoundEnabled:true},
         // Efectos visuales: ruido (film grain), glow dinámico y confeti al ganar
         effects:{noise:false,glow:false,confetti:true}
@@ -818,6 +836,9 @@
     const themeBg2=document.getElementById('themeBg2');
     const themePanel=document.getElementById('themePanel');
     const themePanel2=document.getElementById('themePanel2');
+    const themeHue=document.getElementById('themeHue');
+    const themeSat=document.getElementById('themeSat');
+    const themeBright=document.getElementById('themeBright');
 // Control para el efecto parallax del fondo
 const themeParallax=document.getElementById('themeParallax');
     const applyThemeBtn=document.getElementById('applyTheme');
@@ -1158,6 +1179,15 @@ const themeParallax=document.getElementById('themeParallax');
       }else{
         noiseLayer.style.display='none';
       }
+
+      // Aplicar filtros globales de tono, saturación y brillo. Estos filtros se
+      // configuran en la sección de Tema y permiten realizar ajustes extremos
+      // sobre la paleta completa. Hue se expresa en grados; saturación y brillo
+      // son factores multiplicadores (1 = 100%).
+      const hueVal = state.settings.theme.hue || 0;
+      const satVal = state.settings.theme.sat || 1;
+      const brVal = state.settings.theme.bright || 1;
+      document.body.style.filter = `hue-rotate(${hueVal}deg) saturate(${satVal}) brightness(${brVal})`;
     }
     // Ajustes -> cargar valores en formulario
     function applySettingsToUI(){
@@ -1179,6 +1209,10 @@ const themeParallax=document.getElementById('themeParallax');
       themePanel2.value=state.settings.theme.panel2;
       // Cargar valor de parallax (intensidad del efecto 3D)
       if(themeParallax) themeParallax.value = state.settings.theme.parallax || 0;
+      // Cargar controles de ajuste de color (hue, saturación, brillo)
+      if(themeHue) themeHue.value = state.settings.theme.hue != null ? state.settings.theme.hue : 0;
+      if(themeSat) themeSat.value = Math.round((state.settings.theme.sat != null ? state.settings.theme.sat : 1) * 100);
+      if(themeBright) themeBright.value = Math.round((state.settings.theme.bright != null ? state.settings.theme.bright : 1) * 100);
       // actualizar json
       updateThemeJson();
       // No se actualiza control de opacidad de fondo porque se eliminó
@@ -1401,6 +1435,10 @@ const themeParallax=document.getElementById('themeParallax');
       state.settings.theme.panel2=themePanel2.value;
       // Guardar intensidad de parallax
       if(themeParallax) state.settings.theme.parallax = parseFloat(themeParallax.value || 0);
+      // Guardar ajustes de color
+      if(themeHue) state.settings.theme.hue = parseFloat(themeHue.value || 0);
+      if(themeSat) state.settings.theme.sat = parseFloat(themeSat.value || 100) / 100;
+      if(themeBright) state.settings.theme.bright = parseFloat(themeBright.value || 100) / 100;
       applyCssVars();
       applyThemeToUI();
       saveSettings();
@@ -1421,6 +1459,10 @@ const themeParallax=document.getElementById('themeParallax');
         state.settings.theme.panel2=themePanel2.value;
         // Guardar intensidad de parallax al aplicar y volver
         if(themeParallax) state.settings.theme.parallax = parseFloat(themeParallax.value || 0);
+        // Guardar ajustes de color al aplicar y volver
+        if(themeHue) state.settings.theme.hue = parseFloat(themeHue.value || 0);
+        if(themeSat) state.settings.theme.sat = parseFloat(themeSat.value || 100) / 100;
+        if(themeBright) state.settings.theme.bright = parseFloat(themeBright.value || 100) / 100;
         applyCssVars();
         applyThemeToUI();
         saveSettings();
@@ -1437,7 +1479,10 @@ const themeParallax=document.getElementById('themeParallax');
         panel:'#ff56e0',
         panel2:'#ff7cf0',
         wallpaper:'',
-        parallax:0
+        parallax:0,
+        hue:0,
+        sat:1,
+        bright:1
       };
       applyCssVars();
       applyThemeToUI();
@@ -1457,7 +1502,10 @@ const themeParallax=document.getElementById('themeParallax');
         '--x':state.settings.xColor,
         '--o':state.settings.oColor,
         '--wallpaper':state.settings.theme.wallpaper||'',
-        '--parallax':state.settings.theme.parallax
+        '--parallax':state.settings.theme.parallax,
+        '--hue':state.settings.theme.hue||0,
+        '--sat':state.settings.theme.sat||1,
+        '--bright':state.settings.theme.bright||1
       }};
       themeJson.value=JSON.stringify(json,null,2);
     }
@@ -1477,6 +1525,18 @@ const themeParallax=document.getElementById('themeParallax');
         }
         if(vars['--parallax']!==undefined){
           state.settings.theme.parallax = parseFloat(vars['--parallax']) || 0;
+        }
+        if(vars['--hue']!==undefined){
+          state.settings.theme.hue = parseFloat(vars['--hue']) || 0;
+        }
+        if(vars['--sat']!==undefined){
+          // Saturación en JSON se espera como valor absoluto (ej. 1 = 100%).
+          const satVal = parseFloat(vars['--sat']);
+          state.settings.theme.sat = isNaN(satVal) ? 1 : satVal;
+        }
+        if(vars['--bright']!==undefined){
+          const brVal = parseFloat(vars['--bright']);
+          state.settings.theme.bright = isNaN(brVal) ? 1 : brVal;
         }
         // Se ignora la opacidad de fondo en la importación de temas
         applyCssVars();
