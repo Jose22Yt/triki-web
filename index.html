@@ -473,7 +473,10 @@
       <button id="selectWallpaper">Seleccionar imagen</button>
       <button id="clearWallpaper">Quitar fondo</button>
       <input type="file" id="wallpaperInput" accept="image/*" style="display:none;" />
-      <!-- Se eliminó el control de opacidad: el fondo se aplica completo -->
+      <!-- El fondo se aplica completo; control de parallax para efecto 3D -->
+      <label>Parallax (efecto 3D)
+        <input type="range" id="themeParallax" min="0" max="30" step="1" value="0" />
+      </label>
 
       <!-- Botón para aplicar el tema y regresar -->
       <button id="applyThemeAndReturn">Aplicar y volver</button>
@@ -520,7 +523,8 @@
         markScale:1,
         xColor:'#3a3f95',
         oColor:'#ffffff',
-        theme:{bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0',wallpaper:''},
+        // Añadimos "parallax" para controlar el efecto 3D del fondo
+        theme:{bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0',wallpaper:'',parallax:0},
         sound:{enabled:true,volume:0.2,moveSoundEnabled:true}
       },
       lastMove:null,
@@ -572,6 +576,8 @@
     const themeBg2=document.getElementById('themeBg2');
     const themePanel=document.getElementById('themePanel');
     const themePanel2=document.getElementById('themePanel2');
+// Control para el efecto parallax del fondo
+const themeParallax=document.getElementById('themeParallax');
     const applyThemeBtn=document.getElementById('applyTheme');
     const resetThemeBtn=document.getElementById('resetTheme');
     // Botón que aplica el tema y regresa a la pantalla principal
@@ -844,16 +850,26 @@
       // La variable CSS --wallpaper ya no se usa; la imagen se aplica directamente al body
       // Si hay fondo personalizado, aplicarlo tal cual; en caso contrario usar el degradado base.
       if(state.settings.theme.wallpaper){
+        // Cuando hay fondo personalizado se aplica directamente y se ajustan las capas glass para dejar ver la imagen
         document.body.style.background = `url(${state.settings.theme.wallpaper})`;
         document.body.style.backgroundSize = 'cover';
         document.body.style.backgroundPosition = 'center';
         document.body.style.backgroundRepeat = 'no-repeat';
+        // Hacer más transparentes las capas de cristal y las líneas para que el wallpaper sea visible
+        r.setProperty('--glass','rgba(255,255,255,.12)');
+        r.setProperty('--glass2','rgba(255,255,255,.05)');
+        r.setProperty('--stroke','rgba(255,255,255,.18)');
       }else{
+        // Sin fondo personalizado, usar el degradado base y restaurar opacidades predeterminadas
         const grad = linearGradientWithOpacity(state.settings.theme.bg1,state.settings.theme.bg2,1);
         document.body.style.background = grad;
         document.body.style.backgroundSize = '';
         document.body.style.backgroundPosition = '';
         document.body.style.backgroundRepeat = '';
+        // Restaurar valores base de glass y bordes
+        r.setProperty('--glass','rgba(255,255,255,.16)');
+        r.setProperty('--glass2','rgba(255,255,255,.08)');
+        r.setProperty('--stroke','rgba(255,255,255,.25)');
       }
       r.setProperty('--anim-enabled',state.settings.anim?1:0);
       // Ajustar la velocidad del pulso
@@ -878,6 +894,8 @@
       themeBg2.value=state.settings.theme.bg2;
       themePanel.value=state.settings.theme.panel;
       themePanel2.value=state.settings.theme.panel2;
+      // Cargar valor de parallax (intensidad del efecto 3D)
+      if(themeParallax) themeParallax.value = state.settings.theme.parallax || 0;
       // actualizar json
       updateThemeJson();
       // No se actualiza control de opacidad de fondo porque se eliminó
@@ -1081,6 +1099,8 @@
       state.settings.theme.bg2=themeBg2.value;
       state.settings.theme.panel=themePanel.value;
       state.settings.theme.panel2=themePanel2.value;
+      // Guardar intensidad de parallax
+      if(themeParallax) state.settings.theme.parallax = parseFloat(themeParallax.value || 0);
       applyCssVars();
       applyThemeToUI();
       saveSettings();
@@ -1099,6 +1119,8 @@
         state.settings.theme.bg2=themeBg2.value;
         state.settings.theme.panel=themePanel.value;
         state.settings.theme.panel2=themePanel2.value;
+        // Guardar intensidad de parallax al aplicar y volver
+        if(themeParallax) state.settings.theme.parallax = parseFloat(themeParallax.value || 0);
         applyCssVars();
         applyThemeToUI();
         saveSettings();
@@ -1114,7 +1136,8 @@
         bg2:'#b02bd9',
         panel:'#ff56e0',
         panel2:'#ff7cf0',
-        wallpaper:''
+        wallpaper:'',
+        parallax:0
       };
       applyCssVars();
       applyThemeToUI();
@@ -1133,7 +1156,8 @@
         '--panel2':state.settings.theme.panel2,
         '--x':state.settings.xColor,
         '--o':state.settings.oColor,
-        '--wallpaper':state.settings.theme.wallpaper||''
+        '--wallpaper':state.settings.theme.wallpaper||'',
+        '--parallax':state.settings.theme.parallax
       }};
       themeJson.value=JSON.stringify(json,null,2);
     }
@@ -1150,6 +1174,9 @@
         if(vars['--wallpaper']!==undefined){
           // Asignar wallpaper; si es cadena vacía se elimina
           state.settings.theme.wallpaper = vars['--wallpaper'] || '';
+        }
+        if(vars['--parallax']!==undefined){
+          state.settings.theme.parallax = parseFloat(vars['--parallax']) || 0;
         }
         // Se ignora la opacidad de fondo en la importación de temas
         applyCssVars();
@@ -1244,6 +1271,20 @@
     themePanel2.addEventListener('change',updateThemeJson);
     colorX.addEventListener('change',()=>{state.settings.xColor=colorX.value;applyCssVars();updateThemeJson();saveSettings();});
     colorO.addEventListener('change',()=>{state.settings.oColor=colorO.value;applyCssVars();updateThemeJson();saveSettings();});
+    // Animar efecto parallax al mover el ratón si hay fondo
+    document.addEventListener('mousemove',(e)=>{
+      const p = state.settings.theme.parallax || 0;
+      if(state.settings.theme.wallpaper && p > 0){
+        const relX = (e.clientX / window.innerWidth - 0.5) * p;
+        const relY = (e.clientY / window.innerHeight - 0.5) * p;
+        document.body.style.backgroundPosition = `calc(50% + ${relX}px) calc(50% + ${relY}px)`;
+      }else{
+        // Restablecer posición centrada cuando no hay parallax
+        document.body.style.backgroundPosition = 'center';
+      }
+    });
+    // Actualizar JSON cuando cambia el parallax
+    if(themeParallax) themeParallax.addEventListener('input',updateThemeJson);
     // Iniciar autenticación cuando cargue la página
     document.addEventListener('DOMContentLoaded',()=>{
       checkAuth();
