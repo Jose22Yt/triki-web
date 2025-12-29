@@ -249,6 +249,95 @@
       background:color-mix(in srgb,var(--navBtnBgActive) 100%,transparent);
       border-color:color-mix(in srgb,var(--stroke) 80%,transparent);
     }
+
+    /* --- Capas de personalización y efectos --- */
+    /* Lista de categorías para la pantalla de personalización */
+    #styleModal .modalCard{
+      background:color-mix(in srgb,var(--panel2) 86%,white 14%);
+      border-radius:28px;
+      padding:20px;
+      max-width:90%;
+      width:480px;
+      max-height:90vh;
+      overflow:auto;
+      position:relative;
+      color:var(--text);
+      box-shadow:0 18px 40px rgba(0,0,0,.30);
+    }
+    .styleItem{
+      display:flex;
+      align-items:center;
+      gap:14px;
+      margin-top:14px;
+      padding:16px;
+      border-radius:20px;
+      background:color-mix(in srgb,var(--glass2) 96%,transparent);
+      border:1px solid color-mix(in srgb,var(--stroke) 60%,transparent);
+      cursor:pointer;
+      transition:background .2s ease,border-color .2s ease;
+    }
+    .styleItem:hover{
+      background:color-mix(in srgb,var(--glass) 100%,transparent);
+      border-color:color-mix(in srgb,var(--stroke) 80%,transparent);
+    }
+    .styleItemIcon svg{
+      width:28px;
+      height:28px;
+      stroke-width:2;
+      stroke:var(--text);
+      fill:none;
+    }
+    .styleItemContent .title{
+      font-size:20px;
+      font-weight:700;
+      color:var(--text);
+    }
+    .styleItemContent .subtitle{
+      font-size:14px;
+      color:var(--muted);
+    }
+    /* Modal de efectos visuales */
+    #effectsModal .modalCard{
+      background:color-mix(in srgb,var(--panel2) 86%,white 14%);
+      border-radius:28px;
+      padding:20px;
+      max-width:90%;
+      width:480px;
+      max-height:90vh;
+      overflow:auto;
+      position:relative;
+      color:var(--text);
+      box-shadow:0 18px 40px rgba(0,0,0,.30);
+    }
+    /* Capa de ruido para el efecto Film grain */
+    #noiseLayer{
+      position:fixed;
+      top:0;
+      left:0;
+      right:0;
+      bottom:0;
+      pointer-events:none;
+      z-index:-1;
+      background-image:
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 2px, transparent 2px, transparent 4px),
+        repeating-linear-gradient(-45deg, rgba(0,0,0,0.03) 0px, rgba(0,0,0,0.03) 3px, transparent 3px, transparent 6px);
+      background-size:100% 100%;
+      opacity:.5;
+      display:none;
+    }
+    /* Efecto glow dinámico: añade resplandor a las celdas cuando está activado */
+    body.glow-on .cell::after{
+      content:'';
+      position:absolute;
+      top:0;
+      left:0;
+      right:0;
+      bottom:0;
+      border-radius:inherit;
+      box-shadow:0 0 20px 4px color-mix(in srgb,var(--panel2) 70%,transparent);
+      pointer-events:none;
+      z-index:-1;
+    }
     /* Modales */
     .modal{
       position:fixed;
@@ -391,10 +480,140 @@
     </div>
     <!-- Barra inferior de navegación -->
     <div class="nav">
-      <button id="homeBtn" class="active">🏠</button>
-      <button id="settingsBtn">⚙️</button>
-      <button id="themeBtn">🎨</button>
-      <button id="soundBtn">🔊</button>
+      <button id="homeBtn" class="active">
+        <!-- Icono Home (casa) -->
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 10.5L12 3l9 7.5v9a2 2 0 0 1-2 2h-5v-6h-4v6H5a2 2 0 0 1-2-2v-9z" />
+        </svg>
+      </button>
+      <button id="settingsBtn">
+        <!-- Icono Ajustes (engranaje simplificado) -->
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a2 2 0 0 0 .4 2.2l.1.1a2 2 0 0 1-2.1 3.3l-.3 0a2 2 0 0 0-2.1 1.7v.3a2 2 0 0 1-3.8 0l-.2-.6a2 2 0 0 0-1.8-1.4h-.4a2 2 0 0 0-1.8 1.4l-.2.6a2 2 0 0 1-3.8 0l-.3 0a2 2 0 0 1-2.1-3.3l.1-.1a2 2 0 0 0 .4-2.2l-2-1.5a2 2 0 0 1 1.3-3.5h.3a2 2 0 0 0 2.1-1.7l.2-.7a2 2 0 0 1 3.8 0l.2.7a2 2 0 0 0 1.8 1.4h.4a2 2 0 0 0 1.8-1.4l.2-.7a2 2 0 0 1 3.8 0l.3 0a2 2 0 0 0 2.1 1.7h.3a2 2 0 0 1 1.3 3.5l-2 1.5z" />
+        </svg>
+      </button>
+      <button id="themeBtn">
+        <!-- Icono Paleta de colores -->
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 21c-5 0-9-3.8-9-7.6 0-2.3 1.9-4.1 4-4.9 0-.4-.1-.8-.1-1.2C6.9 4.2 9.9 1 13.2 1c3.3 0 6.1 2.6 6.3 6.1 2.2.7 3.9 2.7 3.9 5 0 4.3-4.4 7.9-9.4 7.9h-2z" />
+          <circle cx="8.5" cy="10" r="1.5" />
+          <circle cx="14.5" cy="8" r="1.5" />
+          <circle cx="15.5" cy="13.5" r="1.5" />
+          <circle cx="9.5" cy="14" r="1.5" />
+        </svg>
+      </button>
+      <button id="soundBtn">
+        <!-- Icono Sonido (altavoz) -->
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="3 9 9 9 13 5 13 19 9 15 3 15 3 9" />
+          <path d="M16 8.5a3.5 3.5 0 0 1 0 7" />
+          <path d="M18.5 6a6 6 0 0 1 0 12" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Capa de ruido para film grain (activada mediante efectos visuales) -->
+    <div id="noiseLayer"></div>
+
+    <!-- Modal de Personalización (estilo) -->
+    <div class="modal" id="styleModal">
+      <div class="modalCard">
+        <button class="closeBtn" id="closeStyle">✕</button>
+        <h2>Personalizar</h2>
+        <!-- Lista de categorías -->
+        <div class="styleItem" data-target="theme">
+          <div class="styleItemIcon">
+            <!-- Icono paleta -->
+            <svg viewBox="0 0 24 24">
+              <path d="M12 21c-5 0-9-3.8-9-7.6 0-2.3 1.9-4.1 4-4.9 0-.4-.1-.8-.1-1.2C6.9 4.2 9.9 1 13.2 1c3.3 0 6.1 2.6 6.3 6.1 2.2.7 3.9 2.7 3.9 5 0 4.3-4.4 7.9-9.4 7.9h-2z" />
+              <circle cx="8.5" cy="10" r="1.5" />
+              <circle cx="14.5" cy="8" r="1.5" />
+              <circle cx="15.5" cy="13.5" r="1.5" />
+              <circle cx="9.5" cy="14" r="1.5" />
+            </svg>
+          </div>
+          <div class="styleItemContent">
+            <div class="title">Temas</div>
+            <div class="subtitle">Apariencia visual</div>
+          </div>
+        </div>
+        <div class="styleItem" data-target="icons">
+          <div class="styleItemIcon">
+            <!-- Icono para iconos X/O: círculo y cruz -->
+            <svg viewBox="0 0 24 24">
+              <circle cx="8" cy="12" r="3" />
+              <line x1="14" y1="9" x2="20" y2="15"></line>
+              <line x1="20" y1="9" x2="14" y2="15"></line>
+            </svg>
+          </div>
+          <div class="styleItemContent">
+            <div class="title">Iconos X/O</div>
+            <div class="subtitle">Estilo y color</div>
+          </div>
+        </div>
+        <div class="styleItem" data-target="board">
+          <div class="styleItemIcon">
+            <!-- Icono del tablero: cuadrados superpuestos -->
+            <svg viewBox="0 0 24 24">
+              <rect x="3" y="3" width="6" height="6"></rect>
+              <rect x="9" y="9" width="6" height="6"></rect>
+              <rect x="15" y="15" width="6" height="6"></rect>
+            </svg>
+          </div>
+          <div class="styleItemContent">
+            <div class="title">Estilo del tablero</div>
+            <div class="subtitle">iOS Glass y más</div>
+          </div>
+        </div>
+        <div class="styleItem" data-target="wallpaper">
+          <div class="styleItemIcon">
+            <!-- Icono de fondo personalizado: foto/montaña -->
+            <svg viewBox="0 0 24 24">
+              <rect x="3" y="4" width="18" height="14" rx="2" ry="2"></rect>
+              <circle cx="9" cy="10" r="2"></circle>
+              <polyline points="21 14 16 10 12 14 3 7"></polyline>
+            </svg>
+          </div>
+          <div class="styleItemContent">
+            <div class="title">Fondo personalizado</div>
+            <div class="subtitle">Imagen de galería</div>
+          </div>
+        </div>
+        <div class="styleItem" data-target="effects">
+          <div class="styleItemIcon">
+            <!-- Icono de efectos: estrella con destellos -->
+            <svg viewBox="0 0 24 24">
+              <path d="M12 2l1.4 4.2L18 6l-3.3 3.5L15 14l-3-2.2L9 14l.3-4.5L6 6l4.6-.8L12 2z"></path>
+              <circle cx="19" cy="3" r="1.5"></circle>
+              <circle cx="4" cy="17" r="1.5"></circle>
+            </svg>
+          </div>
+          <div class="styleItemContent">
+            <div class="title">Efectos visuales</div>
+            <div class="subtitle">Partículas y animación</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de efectos visuales -->
+    <div class="modal" id="effectsModal">
+      <div class="modalCard">
+        <button class="closeBtn" id="closeEffects">✕</button>
+        <h2>Efectos visuales</h2>
+        <label>Ruido / Film grain
+          <input type="checkbox" id="noiseEnabled" />
+        </label>
+        <label>Glow dinámico
+          <input type="checkbox" id="glowEnabled" />
+        </label>
+        <label>Celebración al ganar (confeti)
+          <input type="checkbox" id="confettiEnabled" checked />
+        </label>
+        <button id="applyEffects">Aplicar</button>
+        <button id="backEffects">Volver</button>
+      </div>
     </div>
   </div>
   <!-- Modal de Ajustes del Juego -->
@@ -534,7 +753,9 @@
         oColor:'#ffffff',
         // Añadimos "parallax" para controlar el efecto 3D del fondo
         theme:{bg1:'#6c2bd9',bg2:'#b02bd9',panel:'#ff56e0',panel2:'#ff7cf0',wallpaper:'',parallax:0},
-        sound:{enabled:true,volume:0.2,moveSoundEnabled:true}
+        sound:{enabled:true,volume:0.2,moveSoundEnabled:true},
+        // Efectos visuales: ruido (film grain), glow dinámico y confeti al ganar
+        effects:{noise:false,glow:false,confetti:true}
       },
       lastMove:null,
       playing:true
@@ -562,11 +783,23 @@
     const settingsModal=document.getElementById('settingsModal');
     const themeModal=document.getElementById('themeModal');
     const soundModal=document.getElementById('soundModal');
+    const styleModal=document.getElementById('styleModal');
+    const effectsModal=document.getElementById('effectsModal');
     // Nav
     const homeBtn=document.getElementById('homeBtn');
     const settingsBtn=document.getElementById('settingsBtn');
     const themeBtn=document.getElementById('themeBtn');
     const soundBtn=document.getElementById('soundBtn');
+    // Capa de ruido
+    const noiseLayer=document.getElementById('noiseLayer');
+    // Estilo (personalizar) items
+    const closeStyle=document.getElementById('closeStyle');
+    const closeEffects=document.getElementById('closeEffects');
+    const noiseEnabled=document.getElementById('noiseEnabled');
+    const glowEnabled=document.getElementById('glowEnabled');
+    const confettiEnabled=document.getElementById('confettiEnabled');
+    const applyEffectsBtn=document.getElementById('applyEffects');
+    const backEffects=document.getElementById('backEffects');
     // Ajustes UI
     const modeSelect=document.getElementById('modeSelect');
     const aiDelay=document.getElementById('aiDelay');
@@ -733,6 +966,7 @@ const themeParallax=document.getElementById('themeParallax');
       applySettingsToUI();
       applyThemeToUI();
       applySoundToUI();
+      applyEffectsToUI();
       applyCssVars();
       // Construir tablero
       boardEl.innerHTML='';
@@ -912,6 +1146,18 @@ const themeParallax=document.getElementById('themeParallax');
       // Ajustar la velocidad del pulso
       r.setProperty('--pop-speed', (state.settings.animSpeed||0.3) + 's');
       document.body.classList.toggle('anim-off',!state.settings.anim);
+      // Aplicar estado del efecto glow
+      if(state.settings.effects && state.settings.effects.glow){
+        document.body.classList.add('glow-on');
+      }else{
+        document.body.classList.remove('glow-on');
+      }
+      // Mostrar u ocultar la capa de ruido en función de la configuración
+      if(state.settings.effects && state.settings.effects.noise){
+        noiseLayer.style.display='block';
+      }else{
+        noiseLayer.style.display='none';
+      }
     }
     // Ajustes -> cargar valores en formulario
     function applySettingsToUI(){
@@ -941,6 +1187,13 @@ const themeParallax=document.getElementById('themeParallax');
       soundEnabled.checked=state.settings.sound.enabled;
       soundVolume.value=state.settings.sound.volume;
       if(moveSoundEnabled) moveSoundEnabled.checked = state.settings.sound.moveSoundEnabled;
+    }
+
+    // Efectos visuales -> cargar valores
+    function applyEffectsToUI(){
+      noiseEnabled.checked = state.settings.effects && state.settings.effects.noise;
+      glowEnabled.checked = state.settings.effects && state.settings.effects.glow;
+      confettiEnabled.checked = state.settings.effects && state.settings.effects.confetti;
     }
     // Guardar configuración
     function saveSettings(){
@@ -1057,14 +1310,16 @@ const themeParallax=document.getElementById('themeParallax');
         msg.textContent = winner==='X' ? '¡X gana!' : '¡O gana!';
       }
       overlay.appendChild(msg);
-      // Crear partículas de confeti
-      for(let i=0;i<30;i++){
-        const conf=document.createElement('div');
-        conf.className='confetti';
-        conf.style.left=(Math.random()*100)+'vw';
-        conf.style.backgroundColor=confColors[Math.floor(Math.random()*confColors.length)];
-        conf.style.animationDuration=(2+Math.random())+'s';
-        overlay.appendChild(conf);
+      // Añadir confeti solo si está activado en efectos
+      if(state.settings.effects && state.settings.effects.confetti){
+        for(let i=0;i<30;i++){
+          const conf=document.createElement('div');
+          conf.className='confetti';
+          conf.style.left=(Math.random()*100)+'vw';
+          conf.style.backgroundColor=confColors[Math.floor(Math.random()*confColors.length)];
+          conf.style.animationDuration=(2+Math.random())+'s';
+          overlay.appendChild(conf);
+        }
       }
       document.body.appendChild(overlay);
       // Eliminar después de 3 segundos
@@ -1078,7 +1333,15 @@ const themeParallax=document.getElementById('themeParallax');
     }
     homeBtn.addEventListener('click',()=>{closeAllModals();homeBtn.classList.add('active');settingsBtn.classList.remove('active');themeBtn.classList.remove('active');soundBtn.classList.remove('active');});
     settingsBtn.addEventListener('click',()=>{closeAllModals();settingsModal.classList.add('active');settingsBtn.classList.add('active');homeBtn.classList.remove('active');themeBtn.classList.remove('active');soundBtn.classList.remove('active');});
-    themeBtn.addEventListener('click',()=>{closeAllModals();themeModal.classList.add('active');themeBtn.classList.add('active');homeBtn.classList.remove('active');settingsBtn.classList.remove('active');soundBtn.classList.remove('active');});
+    // Botón de tema ahora abre el modal de personalización (styleModal)
+    themeBtn.addEventListener('click',()=>{
+      closeAllModals();
+      styleModal.classList.add('active');
+      themeBtn.classList.add('active');
+      homeBtn.classList.remove('active');
+      settingsBtn.classList.remove('active');
+      soundBtn.classList.remove('active');
+    });
     soundBtn.addEventListener('click',()=>{closeAllModals();soundModal.classList.add('active');soundBtn.classList.add('active');homeBtn.classList.remove('active');settingsBtn.classList.remove('active');themeBtn.classList.remove('active');});
     // Cerrar con botón ✕
     document.getElementById('closeSettings').onclick=()=>{settingsModal.classList.remove('active');settingsBtn.classList.remove('active');homeBtn.classList.add('active');};
@@ -1327,6 +1590,68 @@ const themeParallax=document.getElementById('themeParallax');
       checkAuth();
       // Adjuntar animación de pulsación a elementos interactivos una vez cargado el DOM
       attachPopToElements();
+
+      // Personalización: manejar clics en los ítems de la pantalla de estilo
+      document.querySelectorAll('.styleItem').forEach(item=>{
+        item.addEventListener('click',()=>{
+          const target=item.dataset.target;
+          // Cerrar la pantalla de personalización
+          styleModal.classList.remove('active');
+          // Reset nav active
+          themeBtn.classList.remove('active');
+          settingsBtn.classList.remove('active');
+          soundBtn.classList.remove('active');
+          homeBtn.classList.remove('active');
+          // Abrir el modal correspondiente
+          if(target==='theme'){
+            themeModal.classList.add('active');
+            themeBtn.classList.add('active');
+          }else if(target==='icons'){
+            settingsModal.classList.add('active');
+            settingsBtn.classList.add('active');
+          }else if(target==='board'){
+            settingsModal.classList.add('active');
+            settingsBtn.classList.add('active');
+          }else if(target==='wallpaper'){
+            themeModal.classList.add('active');
+            themeBtn.classList.add('active');
+          }else if(target==='effects'){
+            effectsModal.classList.add('active');
+            themeBtn.classList.add('active');
+          }
+        });
+      });
+      // Botón para cerrar la pantalla de personalización
+      if(closeStyle) closeStyle.addEventListener('click',()=>{
+        styleModal.classList.remove('active');
+        // Restablecer navegación
+        themeBtn.classList.remove('active');
+        homeBtn.classList.add('active');
+      });
+      // Cerrar efectos visuales
+      if(closeEffects) closeEffects.addEventListener('click',()=>{
+        effectsModal.classList.remove('active');
+        themeBtn.classList.remove('active');
+        homeBtn.classList.add('active');
+      });
+      if(backEffects) backEffects.addEventListener('click',()=>{
+        effectsModal.classList.remove('active');
+        themeBtn.classList.remove('active');
+        homeBtn.classList.add('active');
+      });
+      // Aplicar efectos
+      if(applyEffectsBtn) applyEffectsBtn.addEventListener('click',()=>{
+        state.settings.effects={
+          noise: noiseEnabled.checked,
+          glow: glowEnabled.checked,
+          confetti: confettiEnabled.checked
+        };
+        applyCssVars();
+        saveSettings();
+        effectsModal.classList.remove('active');
+        themeBtn.classList.remove('active');
+        homeBtn.classList.add('active');
+      });
     });
   </script>
 </body>
